@@ -9,7 +9,7 @@ from src.backtest import BackTest
 from src.factor.cape import CapeFactor
 from src.fund_universe import SECURITY_SEDOL
 
-start_date = date(2023, 1, 1)
+start_date = date(2013, 1, 1)
 end_date = date(2023, 10, 31)
 security_universe = SECURITY_SEDOL
 rebalance_period = 60
@@ -67,6 +67,6 @@ ie = InformationCoefficient(long_portfolio, long_factor, market, rebalance_perio
 ie.get_information_coefficient()
 ie.draw()
 
-hr = HitRate(long_portfolio, long_factor, market, rebalance_period, benchmark.benchmark)
+hr = HitRate(long_portfolio, long_factor, market, rebalance_period, benchmark)
 hr.get_hit_rate()
 hr.draw()

@@ -118,6 +118,35 @@ class Market:
             # print(f"not found return value for {security} at {date}.")
             return 0
 
+    def query_ticker_range_return(self, security, start_date, end_date):
+        res = (
+            self.data[security]
+            .filter(pl.col("date") >= start_date)
+            .filter(pl.col("date") <= end_date)
+            .filter(pl.col("return").is_not_null())
+            .select(pl.col("return").sum().alias("return"))
+        )
+        if len(res) == 1 and abs(res.get_column("return").item(0)) < 5:
+            return res.get_column("return").item(0)
+        else:
+            # print(f"not found return value for {security} at {date}.")
+            return 0
+
+    def query_sedol_range_return(self, security, start_date, end_date):
+        res = (
+            self.data.filter(pl.col("sedol7") == security.sedol_id)
+            .filter(pl.col("date") >= start_date)
+            .filter(pl.col("date") <= end_date)
+            .filter(pl.col("return").is_not_null())
+            .group_by("sedol7")
+            .agg(pl.col("return").sum().alias("return"))
+        )
+        if len(res) == 1 and abs(res.get_column("return").item(0)) < 5:
+            return res.get_column("return").item(0)
+        else:
+            # print(f"not found return value for {security} at {date}.")
+            return 0
+
 
 if __name__ == "__main__":
     from datetime import date

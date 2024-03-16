@@ -5,7 +5,7 @@ class BaseFactor(ABC):
     def __init__(self, security_universe, factor_type):
         self.security_universe = security_universe
         self.factor_type = factor_type
-        self.num = 100
+        self.num = 20
 
     def set_portfolio_at_start(self, portfolio):
         position = self.get_position(portfolio.start_date)
