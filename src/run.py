@@ -67,6 +67,6 @@ ie = InformationCoefficient(long_portfolio, long_factor, market, rebalance_perio
 ie.get_information_coefficient()
 ie.draw()
 
-hr = HitRate(long_portfolio, long_factor, market, rebalance_period, benchmark.benchmark)
+hr = HitRate(long_portfolio, long_factor, market, rebalance_period, benchmark)
 hr.get_hit_rate()
 hr.draw()
