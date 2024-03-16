@@ -64,10 +64,10 @@ class CapeImpl:
             ((pl.col("signal") - pl.col("mean")) / pl.col("std")).alias("z-score")
         )
         # print(merge)
-        ordered_sector = (
+        sorted_security = (
             merge_df.sort("z-score", descending=True).get_column("sedol7").to_list()
         )
-        return ordered_sector
+        return sorted_security
 
     def get_security_signal(self, date):
         """
@@ -151,7 +151,6 @@ class CapeImpl:
             how="inner",
             on="sedol7",
         )
-        # annulize the PE, rather than using quarterly PE
         signal_df = signal_df.with_columns(
             (pl.col("price") / pl.col("avg_eps")).alias("signal")
         )

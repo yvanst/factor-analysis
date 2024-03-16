@@ -147,7 +147,8 @@ class InformationCoefficient:
         rows = []
         security_list = self.factor.get_security_list(date)
         end_date = date + timedelta(self.rebalance_period)
-        for rank, security in enumerate(security_list):
+        # reverse the list to make preferred securities have a higher rank
+        for rank, security in enumerate(reversed(security_list)):
             range_return = self.market.query_sedol_range_return(
                 security, date, end_date
             )
@@ -167,8 +168,7 @@ class InformationCoefficient:
         ie = self.ie.sort(pl.col("date")).with_columns(
             pl.col("date").cast(pl.String).str.slice(0, 7).alias("date")
         )
-        plt.bar(ie.get_column("date"), ie.get_column("ie"))
-
+        ax.bar(ie.get_column("date"), ie.get_column("ie"))
         step = max(ie.shape[0] // 30, 1)
         ax.set_xticks(
             ticks=ie.get_column("date").to_list()[::step],
@@ -232,7 +232,8 @@ class HitRate:
         hr = self.hr.sort(pl.col("date")).with_columns(
             pl.col("date").cast(pl.String).str.slice(0, 7).alias("date")
         )
-        plt.bar(hr.get_column("date"), hr.get_column("hr"))
+        ax.bar(hr.get_column("date"), hr.get_column("hr"))
+        ax.axhline(y=0.5)
 
         step = max(hr.shape[0] // 30, 1)
         ax.set_xticks(
