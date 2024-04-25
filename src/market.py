@@ -44,7 +44,6 @@ class Market:
                 )
 
     def load_lipper_return_data(self):
-        # TODO: maybe filter on lipper_id
         self.data = (
             pl.scan_parquet("parquet/fund_return/us_fund_daily_return_lipperid.parquet")
             .filter(pl.col("end_date") >= self.start_date)
@@ -53,7 +52,6 @@ class Market:
         )
 
     def load_sedol_return_data(self):
-        # TODO: maybe filter on lipper_id
         self.data = (
             pl.scan_parquet(
                 "parquet/fund_return/us_security_sedol_return_daily.parquet"
