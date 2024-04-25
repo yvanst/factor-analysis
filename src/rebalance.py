@@ -82,7 +82,7 @@ class Rebalance:
         # sold first and then buy
         position_change.sort(key=lambda p: p[1])
         print(
-            f"rebalance on {cur_date}: {list(map(lambda t: (t[0].display(), round(t[1],3)), position_change))}"
+            f"rebalance on {cur_date}: {list(map(lambda t: (t[0].display(), round(t[1],3)), position_change[:3]))}..."
         )
 
         turnover = sum((map(lambda t: abs(t[1]), position_change)))
