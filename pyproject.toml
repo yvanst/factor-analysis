@@ -1,0 +1,29 @@
+[tool.poetry]
+name = "factor-backtest"
+version = "0.1.0"
+description = ""
+authors = ["Yifei"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.11"
+polars = {extras = ["xlsx2csv"], version = "^0.20.18"}
+numpy = "^1.26.4"
+matplotlib = "^3.8.3"
+yfinance = "^0.2.37"
+jupyterlab = "^4.1.5"
+scikit-learn = "^1.4.2"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.3.0"
+isort = "^5.13.2"
+duckdb = "^0.10.1"
+pre-commit = "^3.7.0"
+
+[tool.isort]
+profile = 'black'
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

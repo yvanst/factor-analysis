@@ -1,5 +1,6 @@
 import polars as pl
-from src.security_symbol import SecuritySedol
+
+from src.security_symbol import SecuritySedol, SecurityTicker
 
 sedol_list = (
     pl.read_parquet("parquet/base/us_sector_weight.parquet")
@@ -13,3 +14,21 @@ sedol_list = (
 
 
 SECURITY_SEDOL = [SecuritySedol(id) for id in sedol_list]
+ishare_ticker_sector_etf = {
+    "Consumer Discretionary": "IYC",
+    "Energy": "IYE",
+    "Real Estate": "IYR",
+    "Materials": "IYM",
+    "Utilities": "IDU",
+    "Information Technology": "IYW",
+    "Communication Services": "IYZ",
+    "Health Care": "IYH",
+    "Industrials": "IYJ",
+    "Consumer Staples": "IYK",
+    "Financials": "IYF",
+}
+
+# market weight ETF
+ISHARE_SECTOR_ETF_TICKER = [
+    SecurityTicker(v, k) for k, v in ishare_ticker_sector_etf.items()
+]

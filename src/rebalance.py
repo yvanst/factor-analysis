@@ -1,13 +1,52 @@
 class Rebalance:
-    def __init__(self, period, portfolio, factor, disable_rebalance=False) -> None:
+    def __init__(
+        self,
+        period,
+        portfolio,
+        factor,
+        interval="1d",
+        disable_rebalance=False,
+    ) -> None:
         self.period = period
         self.portfolio = portfolio
         self.factor = factor
+        # could be "1d" or "1mo"
+        # if "1mon", then rebalance happens at the last market open day of the month
+        self.interval = interval
         self.disable_rebalance = disable_rebalance
 
-    def run(self, iter_index):
+    def check_and_run(self, iter_index, prev_rebalance_index):
         if self.disable_rebalance:
-            return
+            return False
+        if iter_index + 1 >= len(self.portfolio.date_df):
+            return False
+
+        if self.interval == "1d":
+            if iter_index % self.period == 0:
+                self.run(iter_index)
+                return True
+            else:
+                return False
+        elif self.interval == "1mo":
+            prev_rebalance_date = self.portfolio.date_df.item(prev_rebalance_index, 0)
+            cur_date = self.portfolio.date_df.item(iter_index, 0)
+            next_date = self.portfolio.date_df.item(iter_index + 1, 0)
+            if self.interval == "1mo" and cur_date.month == next_date.month:
+                return False
+            diff = (
+                cur_date.month - prev_rebalance_date.month
+                if cur_date.year == prev_rebalance_date.year
+                else cur_date.month + 12 - prev_rebalance_date.month
+            )
+            if self.interval == "1mo" and diff == self.period:
+                self.run(iter_index)
+                return True
+            else:
+                return False
+        else:
+            raise ValueError(f"no implementation for {self.interval}")
+
+    def run(self, iter_index):
         cur_date = self.portfolio.date_df.item(iter_index, 0)
         position = self.factor.get_position(cur_date)
 
@@ -40,16 +79,16 @@ class Rebalance:
             original_weight = self.portfolio.get_security_weight(security, iter_index)
             position_change.append((security, weight - original_weight))
 
+        # sold first and then buy
+        position_change.sort(key=lambda p: p[1])
+        print(
+            f"rebalance on {cur_date}: {list(map(lambda t: (t[0].display(), round(t[1],3)), position_change))}"
+        )
+
         turnover = sum((map(lambda t: abs(t[1]), position_change)))
         self.portfolio.value_book[iter_index]["turnover"] = turnover
         # sector = ",".join((map(lambda t: t[0].sector, position_change)))
         # self.portfolio.value_book[iter_index]["sector"] = sector
-
-        # sold first and then buy
-        position_change.sort(key=lambda p: p[1])
-        print(
-            f"rebalance on {cur_date}, turnover({round(turnover, 3)}): {list(map(lambda t: (t[0].display(), round(t[1],3)), position_change[:3]))}..."
-        )
 
         for security, weight_change in position_change:
             if weight_change < 0:

@@ -1,11 +1,12 @@
-from pathlib import Path
 import time
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import polars as pl
 import yfinance
 
-from src.security_symbol import SecurityTicker, SecurityLipper, SecuritySedol
+from src.security_symbol import SecurityLipper, SecuritySedol, SecurityTicker
 
 
 class Market:
@@ -82,6 +83,16 @@ class Market:
         else:
             raise ValueError(f"unexpected type: {security}")
 
+    def query_range_return(self, security, start_date, end_date):
+        if isinstance(security, SecurityTicker):
+            return self.query_ticker_range_return(security, start_date, end_date)
+        elif isinstance(security, SecurityLipper):
+            return self.query_lipper_range_return(security, start_date, end_date)
+        elif isinstance(security, SecuritySedol):
+            return self.query_sedol_range_return(security, start_date, end_date)
+        else:
+            raise ValueError(f"unexpected type: {security}")
+
     def query_ticker_return(self, security, date):
         res = (
             self.data[security]
@@ -124,12 +135,13 @@ class Market:
             .filter(pl.col("date") >= start_date)
             .filter(pl.col("date") <= end_date)
             .filter(pl.col("return").is_not_null())
-            .select(pl.col("return").sum().alias("return"))
+            .sort(pl.col("date"))
+            .get_column("adj close")
         )
-        if len(res) == 1 and abs(res.get_column("return").item(0)) < 5:
-            return res.get_column("return").item(0)
+        range_return = res.item(-1) / res.item(0) - 1
+        if len(res) > 1 and range_return < 1:
+            return range_return
         else:
-            # print(f"not found return value for {security} at {date}.")
             return 0
 
     def query_sedol_range_return(self, security, start_date, end_date):
@@ -144,7 +156,6 @@ class Market:
         if len(res) == 1 and abs(res.get_column("return").item(0)) < 5:
             return res.get_column("return").item(0)
         else:
-            # print(f"not found return value for {security} at {date}.")
             return 0
 
 

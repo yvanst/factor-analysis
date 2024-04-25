@@ -6,7 +6,7 @@ class BackTest:
         self.iter_index = 1
         self.market = market
         self.rebalance = rebalance
-        self.prev_rebalance_index = self.iter_index
+        self.prev_rebalance_index = 0
 
     def run(self):
         last_index = self.portfolio.value_book[-1]["index"]
@@ -27,6 +27,5 @@ class BackTest:
         self.portfolio.update_portfolio(self.iter_index)
 
         # apply rebalance
-        if self.iter_index % self.rebalance.period == 0:
-            self.rebalance.run(self.iter_index)
+        if self.rebalance.check_and_run(self.iter_index, self.prev_rebalance_index):
             self.prev_rebalance_index = self.iter_index

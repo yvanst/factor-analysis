@@ -1,15 +1,17 @@
 from datetime import date
-from src.security_symbol import SecurityTicker
-from src.market import Market
-from src.portfolio import Portfolio
-from src.analysis import Analysis, Benchmark
-from src.metric import Metric, InformationCoefficient, HitRate
-from src.rebalance import Rebalance
+
+from src.analysis.plot import Plot
 from src.backtest import BackTest
+from src.benchmark import Benchmark
 from src.factor.cape import CapeFactor
 from src.fund_universe import SECURITY_SEDOL
+from src.market import Market
+from src.metric import HitRate, InformationCoefficient, Metric
+from src.portfolio import Portfolio
+from src.rebalance import Rebalance
+from src.security_symbol import SecurityTicker
 
-start_date = date(2013, 1, 1)
+start_date = date(2010, 1, 1)
 end_date = date(2023, 10, 31)
 security_universe = SECURITY_SEDOL
 rebalance_period = 60
@@ -55,13 +57,13 @@ print(f"average monthly turnover: {metric.avg_monthly_turnover()}")
 print(f"sharpe ratio(with risk-free rate 0.04): {metric.sharpe_ratio()}")
 
 
-analysis = Analysis(
+plot = Plot(
     long_portfolio,
     short_portfolio,
     benchmark_performance,
     "SPX",
 )
-analysis.draw()
+plot.draw()
 
 ie = InformationCoefficient(long_portfolio, long_factor, market, rebalance_period)
 ie.get_information_coefficient()
