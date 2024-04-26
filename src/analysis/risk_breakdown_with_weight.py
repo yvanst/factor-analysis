@@ -1,7 +1,7 @@
 import polars as pl
 
-from src.security_symbol import SecuritySedol
 from src.market import Market
+from src.security_symbol import SecuritySedol
 
 
 class RiskBreakdownWithWeight:

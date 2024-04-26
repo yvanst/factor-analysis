@@ -1,14 +1,16 @@
+import datetime
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import polars as pl
 import seaborn as sns
 
+from src.analysis.risk_breakdown_with_weight import RiskBreakdownWithWeight
 from src.benchmark import Benchmark
 from src.fund_universe import ISHARE_SECTOR_ETF_TICKER
 from src.market import Market
 from src.security_symbol import SecuritySedol
-from src.analysis.risk_breakdown_with_weight import RiskBreakdownWithWeight
 
 
 class RiskBreakdownToFactor:
@@ -18,13 +20,18 @@ class RiskBreakdownToFactor:
         self.holding_snapshot = portforlio.holding_snapshots[
             datetime.date(portforlio.end_date.year, portforlio.end_date.month, 1)
         ]
-        self.benchmark = benchmark
-        # TODO: filter on 60
         self.month_range = 60
+        # 60 months before end_date
+        end_date = self.portfolio.end_date
+        if end_date.month == 2 and end_date.day == 29:
+            end_date = datetime.date(end_date.year, 2, 28)
+        self.start_date = datetime.date(end_date.year - 5, end_date.month, end_date.day)
+        self.end_date = end_date
+        self.benchmark = Benchmark(benchmark.benchmark, self.start_date, self.end_date)
         self.month_df = (
             pl.scan_parquet("parquet/base/us_sector_weight.parquet")
-            .filter(pl.col("date") >= self.portfolio.start_date)
-            .filter(pl.col("date") <= self.portfolio.end_date)
+            .filter(pl.col("date") >= self.start_date)
+            .filter(pl.col("date") <= self.end_date)
             .select("date")
             .unique()
             .collect()
@@ -34,8 +41,8 @@ class RiskBreakdownToFactor:
     def get_stock_beta_against_factors(self):
         security_df = (
             pl.scan_parquet("parquet/base/us_sector_weight.parquet")
-            .filter(pl.col("date") >= self.portfolio.start_date)
-            .filter(pl.col("date") <= self.portfolio.end_date)
+            .filter(pl.col("date") >= self.start_date)
+            .filter(pl.col("date") <= self.end_date)
             .select(["sedol7", "date", "weight"])
             .collect()
             .rename({"sedol7": "security"})
@@ -53,7 +60,6 @@ class RiskBreakdownToFactor:
         residual, beta = self.regress(
             factor_orth, ticker_return_df.select(ticker_cols).to_pandas()
         )
-        # TODO: how to maintain order
         index = [
             "benchmark_return",
             "Consumer Discretionary",
@@ -81,7 +87,7 @@ class RiskBreakdownToFactor:
         )
 
         risk_breakdown_with_weight = RiskBreakdownWithWeight(
-            self.holding_snapshot, self.portfolio.start_date, self.portfolio.end_date
+            self.holding_snapshot, self.start_date, self.end_date
         )
         security_weight = (
             risk_breakdown_with_weight.get_security_with_weight()
@@ -93,7 +99,7 @@ class RiskBreakdownToFactor:
         )
         # TODO: why nan
         beta = beta.fillna(0)
-        factor_loading = beta.dot(security_weight)
+        self.factor_loading = beta.dot(security_weight)
 
         #### total risk attribution 1
         F = factor_orth.cov()
@@ -107,7 +113,7 @@ class RiskBreakdownToFactor:
             portfolio_weight.dot(idiosyncratic_variance).dot(portfolio_weight) * 12
         )
         total_risk = np.sqrt(systematic_risk + stock_specific_risk)
-        total_risk_attribution_df1 = pl.DataFrame(
+        self.total_risk_attribution_df1 = pl.DataFrame(
             {
                 "total_risk": total_risk,
                 "systematic_risk": systematic_risk,
@@ -137,7 +143,7 @@ class RiskBreakdownToFactor:
             .dot(portfolio_weight)
             * 12
         )
-        total_risk_attribution_df2 = pl.DataFrame(
+        self.total_risk_attribution_df2 = pl.DataFrame(
             {
                 "systematic_risk": systematic_risk,
                 "total_risk_benchmark": total_risk_benchmark,
@@ -154,11 +160,11 @@ class RiskBreakdownToFactor:
                 portfolio_weight.dot(beta.T).dot(F_i).dot(beta).dot(portfolio_weight)
                 * 12
             )
-        total_risk_attribution_df3 = pd.Series(total_risk_i, F.index)
+        self.total_risk_attribution_df3 = pd.Series(total_risk_i, F.index)
 
         #### MCTR
         V = (beta.T.dot(F).dot(beta) + idiosyncratic_variance) * 12
-        MCTR = V.dot(portfolio_weight) / total_risk
+        self.MCTR = V.dot(portfolio_weight) / total_risk
 
         #### tracking error attribution 1
         active_weight = security_weight["active_weight"]
@@ -169,7 +175,7 @@ class RiskBreakdownToFactor:
             active_weight.dot(idiosyncratic_variance).dot(active_weight) * 12
         )
         tracking_error = np.sqrt(systematic_active_risk + stock_specific_active_risk)
-        tracking_error_attribution_df1 = pl.DataFrame(
+        self.tracking_error_attribution_df1 = pl.DataFrame(
             {
                 "systematic_active_risk": systematic_active_risk,
                 "stock_specific_active_risk": stock_specific_active_risk,
@@ -192,7 +198,7 @@ class RiskBreakdownToFactor:
             .dot(active_weight)
             * 12
         )
-        tracking_error_attribution_df2 = pl.DataFrame(
+        self.tracking_error_attribution_df2 = pl.DataFrame(
             {
                 "systematic_active_risk": systematic_active_risk,
                 "benchmark_active_risk": benchmark_active_risk,
@@ -207,10 +213,10 @@ class RiskBreakdownToFactor:
             active_risk_i.append(
                 active_weight.dot(beta.T).dot(F_i).dot(beta).dot(active_weight) * 12
             )
-        tracking_error_attribution_df3 = pd.Series(active_risk_i, F.index)
+        self.tracking_error_attribution_df3 = pd.Series(active_risk_i, F.index)
 
         #### MCAR
-        MCAR = V.dot(active_weight) / tracking_error
+        self.MCAR = V.dot(active_weight) / tracking_error
         return
 
     def get_orthogonalized_factor(self, use_intercept=True):
@@ -262,13 +268,10 @@ class RiskBreakdownToFactor:
         return factor_orth
 
     def get_sector_monthly_return_df(self):
-        start_date = datetime.date(
-            self.portfolio.start_date.year, self.portfolio.start_date.month, 1
-        )
         market = Market(
             ISHARE_SECTOR_ETF_TICKER,
-            start_date,
-            self.portfolio.end_date,
+            self.start_date,
+            self.end_date,
         )
         sector_df_list = []
         for sector_ticker in ISHARE_SECTOR_ETF_TICKER:
@@ -304,13 +307,10 @@ class RiskBreakdownToFactor:
         return sector_performance_df
 
     def get_securities_monthly_return_df(self, security_df: pl.DataFrame):
-        start_date = datetime.date(
-            self.portfolio.start_date.year, self.portfolio.start_date.month, 1
-        )
         market = Market(
             [SecuritySedol(security_df.get_column("security").item(0))],
-            start_date,
-            self.portfolio.end_date,
+            self.start_date,
+            self.end_date,
         )
         security_df = security_df.with_columns(
             pl.col("date").dt.month_start().alias("current_start_date"),
