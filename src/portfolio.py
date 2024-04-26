@@ -1,4 +1,5 @@
 from collections import defaultdict
+import datetime
 
 import numpy as np
 import polars as pl
@@ -145,9 +146,13 @@ class Portfolio:
         weight_list = []
         for security in self.hold_securities(iter_index):
             weight = self.get_security_weight(security, iter_index)
-            security_list.append(security)
+            security_list.append(security.sedol_id)
             weight_list.append(weight)
         cur_date = self.date_df.item(iter_index, 0)
-        self.holding_snapshots[cur_date] = pl.DataFrame(
+        if cur_date.month == 12:
+            cur_month = datetime.date(cur_date.year + 1, 1, 1)
+        else:
+            cur_month = datetime.date(cur_date.year, cur_date.month + 1, 1)
+        self.holding_snapshots[cur_month] = pl.DataFrame(
             {"security": security_list, "weight": weight_list, "date": cur_date}
         )

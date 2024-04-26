@@ -1,23 +1,33 @@
 import polars as pl
 
+from src.security_symbol import SecuritySedol
+from src.market import Market
 
-class RiskBreakdown:
-    def __init__(self, holding_snapshot, market, date):
+
+class RiskBreakdownWithWeight:
+    def __init__(self, holding_snapshot, start_date, end_date):
         self.holding_snapshot: pl.DataFrame = holding_snapshot
-        self.market = market
-        self.date = date
+        self.start_date = start_date
+        self.end_date = end_date
         self.sector_info_df = (
             pl.scan_parquet("parquet/base/us_sector_info.parquet")
-            .filter(pl.col("date").dt.year() == date.year)
-            .filter(pl.col("date").dt.month() == date.month)
+            .filter(pl.col("date") >= start_date)
+            .filter(pl.col("date") <= end_date)
             .select(["sedol7", "sector"])
             .collect()
         )
         self.benchmark_sector_weight_df = self.benchmark_sector_construction()
 
-    def break_down_to_sectors(self):
+    def get_snapshot_holding_sector_and_forward_return(self):
+        market = Market(
+            [SecuritySedol(holding_snapshot.get_column("security").item(0))],
+            self.start_date,
+            self.end_date,
+        )
         holding_snapshot = self.holding_snapshot.join(
-            self.sector_info_df.rename({"sedol7": "security"}),
+            self.sector_info_df.filter(pl.col("date").dt.year() == self.end_date.year)
+            .filter(pl.col("date").dt.month() == self.end_date.month)
+            .rename({"sedol7": "security"}),
             on="security",
             how="inner",
         )
@@ -30,7 +40,7 @@ class RiskBreakdown:
         holding_snapshot = holding_snapshot.with_columns(
             pl.struct(["security", "forward_start_date", "forward_end_date"])
             .map_elements(
-                lambda x: self.market.query_sedol_range_return(
+                lambda x: market.query_sedol_range_return(
                     x["security"],
                     x["forward_start_date"],
                     x["forward_end_date"],
@@ -44,16 +54,16 @@ class RiskBreakdown:
     def benchmark_sector_construction(self):
         sector_info = (
             pl.scan_parquet("parquet/base/us_sector_info.parquet")
-            .filter(pl.col("date").dt.year() == self.date.year)
-            .filter(pl.col("date").dt.month() == self.date.month)
+            .filter(pl.col("date").dt.year() == self.end_date.year)
+            .filter(pl.col("date").dt.month() == self.end_date.month)
             .select(["sedol7", "date", "sector"])
             .collect()
         )
 
         sector_weight = (
             pl.scan_parquet("parquet/base/us_sector_weight.parquet")
-            .filter(pl.col("date").dt.year() == self.date.year)
-            .filter(pl.col("date").dt.month() == self.date.month)
+            .filter(pl.col("date").dt.year() == self.end_date.year)
+            .filter(pl.col("date").dt.month() == self.end_date.month)
             .select(["sedol7", "weight"])
             .collect()
         )
@@ -72,8 +82,8 @@ class RiskBreakdown:
         assert sector_weight_df.get_column("benchmark_weight").sum() - 1 < 1e-5
         return sector_weight_df
 
-    def source_of_risk(self):
-        holding_snapshot = self.break_down_to_sectors()
+    def risk_break_down_to_sector(self):
+        holding_snapshot = self.get_snapshot_holding_sector_and_forward_return()
         holding_snapshot = holding_snapshot.group_by("sector").agg(
             pl.col("weight").sum().alias("portfolio_weight"),
         )
@@ -94,12 +104,53 @@ class RiskBreakdown:
         )
         return sector_df
 
+    def get_security_with_weight(self):
+        # security universe: stock weight > 0 in [start_date, end_date]
+        # security weight: stock weight in end_date
+        security_df = (
+            pl.scan_parquet("parquet/base/us_sector_weight.parquet")
+            .filter(pl.col("date") >= self.start_date)
+            .filter(pl.col("date") <= self.end_date)
+            .select(["sedol7", "date", "weight"])
+            .collect()
+            .rename({"sedol7": "security"})
+            .filter(pl.col("weight") > 0)
+        )
+        latest_date = (
+            security_df.select(pl.col("date").max()).get_column("date").item(0)
+        )
+        security_df = security_df.group_by(pl.col("security")).agg(
+            pl.when(pl.col("date") == latest_date)
+            .then(pl.col("weight") / 100)
+            .otherwise(0)
+            .max()
+            .alias("benchmark_weight")
+        )
+        security_df = (
+            security_df.join(self.holding_snapshot, on="security", how="left")
+            .with_columns(pl.coalesce(pl.col("weight"), 0).alias("portfolio_weight"))
+            .with_columns(pl.lit(latest_date).alias("date"))
+            .with_columns(
+                (pl.col("portfolio_weight") - pl.col("benchmark_weight")).alias(
+                    "active_weight"
+                )
+            )
+            .sort(pl.col("active_weight"))
+            .select(
+                "date",
+                "security",
+                "benchmark_weight",
+                "portfolio_weight",
+                "active_weight",
+            )
+        )
+        return security_df
+
 
 if __name__ == "__main__":
     import datetime
 
     from src.fund_universe import SECURITY_SEDOL
-    from src.market import Market
 
     cfg = pl.Config()
     cfg.set_tbl_rows(100)
@@ -107,7 +158,6 @@ if __name__ == "__main__":
     start_date = datetime.date(2012, 12, 31)
     end_date = datetime.date(2023, 10, 31)
     security_universe = SECURITY_SEDOL
-    market = Market(security_universe, start_date, end_date)
 
     df = pl.DataFrame(
         {
@@ -134,8 +184,11 @@ if __name__ == "__main__":
                 "2681511",
             ],
             "weight": 0.05,
-            "date": datetime.date(2016, 1, 29),
+            "date": datetime.date(2013, 10, 31),
         }
     )
-    risk_break = RiskBreakdown(df, market, datetime.date(2016, 1, 29))
-    risk_break.source_of_risk()
+    start_date = datetime.date(2012, 12, 31)
+    end_date = datetime.date(2013, 10, 31)
+    risk_break = RiskBreakdownWithWeight(df, start_date, end_date)
+    # risk_break.risk_break_down_to_sector()
+    risk_break.get_security_with_weight()
