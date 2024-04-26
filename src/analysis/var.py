@@ -121,7 +121,7 @@ class Var:
         ]
         var = pl.DataFrame(
             {
-                "pcts": pcts,
+                "pct": pcts,
                 "1-day return": one_day_return_series,
                 "5-day return": five_day_return_series,
                 "10-day return": ten_day_return_series,

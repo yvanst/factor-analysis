@@ -97,3 +97,4 @@ class Rebalance:
                 )
             if weight_change > 0:
                 self.portfolio.add_security_weight(security, weight_change, iter_index)
+        self.portfolio.append_holding_snapshot(iter_index)

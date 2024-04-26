@@ -10,6 +10,7 @@ class Portfolio:
         self.start_date = self.date_df.item(0, 0)
         self.end_date = self.date_df.item(-1, 0)
         self.iter_index = 0
+        self.holding_snapshots = dict()
 
         self.security_book = defaultdict(self.empty_security_book)
         num = len(self.date_df)
@@ -139,11 +140,14 @@ class Portfolio:
     def get_total_value(self, iter_index):
         return self.value_book[iter_index]["value"]
 
-    def print_snapshot(self, iter_index):
-        total_value = self.get_total_value(iter_index)
-        res = []
+    def append_holding_snapshot(self, iter_index):
+        security_list = []
+        weight_list = []
         for security in self.hold_securities(iter_index):
-            value = self.get_security_value(security, iter_index)
-            res.append(": ".join((security, value)))
-        print(f"total value: {total_value}")
-        print(". ".join(res))
+            weight = self.get_security_weight(security, iter_index)
+            security_list.append(security)
+            weight_list.append(weight)
+        cur_date = self.date_df.item(iter_index, 0)
+        self.holding_snapshots[cur_date] = pl.DataFrame(
+            {"security": security_list, "weight": weight_list, "date": cur_date}
+        )
