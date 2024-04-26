@@ -6,7 +6,7 @@ import pandas as pd
 import polars as pl
 import seaborn as sns
 
-from src.analysis.risk_breakdown_with_weight import RiskBreakdownWithWeight
+from src.analysis.security_weight_util import SecurityWeightUtil
 from src.benchmark import Benchmark
 from src.fund_universe import ISHARE_SECTOR_ETF_TICKER
 from src.market import Market
@@ -14,15 +14,12 @@ from src.security_symbol import SecuritySedol
 
 
 class RiskBreakdownToFactor:
-    def __init__(self, portforlio, benchmark) -> None:
-        self.portfolio = portforlio
-        self.portforlio_performance = portforlio.value_book.select("date", "value")
+    def __init__(self, portforlio, benchmark, end_date) -> None:
         self.holding_snapshot = portforlio.holding_snapshots[
             datetime.date(portforlio.end_date.year, portforlio.end_date.month, 1)
         ]
         self.month_range = 60
         # 60 months before end_date
-        end_date = self.portfolio.end_date
         if end_date.month == 2 and end_date.day == 29:
             end_date = datetime.date(end_date.year, 2, 28)
         self.start_date = datetime.date(end_date.year - 5, end_date.month, end_date.day)
@@ -38,7 +35,7 @@ class RiskBreakdownToFactor:
             .sort(pl.col("date"))
         )
 
-    def get_stock_beta_against_factors(self):
+    def calculate_stock_beta_against_factors(self):
         security_df = (
             pl.scan_parquet("parquet/base/us_sector_weight.parquet")
             .filter(pl.col("date") >= self.start_date)
@@ -85,8 +82,11 @@ class RiskBreakdownToFactor:
             idiosyncratic_variance.index,
             idiosyncratic_variance.index,
         )
+        # TODO:
+        idiosyncratic_variance = idiosyncratic_variance.fillna(0)
+        self.idiosyncratic_variance = idiosyncratic_variance
 
-        risk_breakdown_with_weight = RiskBreakdownWithWeight(
+        risk_breakdown_with_weight = SecurityWeightUtil(
             self.holding_snapshot, self.start_date, self.end_date
         )
         security_weight = (
@@ -97,18 +97,20 @@ class RiskBreakdownToFactor:
             .drop("date", axis=1)
             .set_index("security")
         )
+        self.benchmark_weight = security_weight["benchmark_weight"]
         # TODO: why nan
         beta = beta.fillna(0)
+        self.beta = beta
         self.factor_loading = beta.dot(security_weight)
 
         #### total risk attribution 1
         F = factor_orth.cov()
+        self.F = F
         portfolio_weight = security_weight["portfolio_weight"]
+        self.portfolio_weight = portfolio_weight
         systematic_risk = (
             portfolio_weight.dot(beta.T).dot(F).dot(beta).dot(portfolio_weight) * 12
         )
-        # TODO:
-        idiosyncratic_variance = idiosyncratic_variance.fillna(0)
         stock_specific_risk = (
             portfolio_weight.dot(idiosyncratic_variance).dot(portfolio_weight) * 12
         )
@@ -168,6 +170,7 @@ class RiskBreakdownToFactor:
 
         #### tracking error attribution 1
         active_weight = security_weight["active_weight"]
+        self.active_weight = active_weight
         systematic_active_risk = (
             active_weight.dot(beta.T).dot(F).dot(beta).dot(active_weight) * 12
         )
@@ -376,5 +379,5 @@ if __name__ == "__main__":
     # benchmark_performance = benchmark.get_performance()
 
     df = RiskBreakdownToFactor(
-        long_portfolio, benchmark
-    ).get_stock_beta_against_factors()
+        long_portfolio, benchmark, long_portfolio.end_date
+    ).calculate_stock_beta_against_factors()

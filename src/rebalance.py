@@ -1,15 +1,25 @@
+import cvxpy as cp
+import numpy as np
+import pandas as pd
+import polars as pl
+
+from src.analysis.risk_breakdown_to_factor import RiskBreakdownToFactor
+
+
 class Rebalance:
     def __init__(
         self,
         period,
         portfolio,
         factor,
+        benchmark,
         interval="1d",
         disable_rebalance=False,
     ) -> None:
         self.period = period
         self.portfolio = portfolio
         self.factor = factor
+        self.benchmark = benchmark
         # could be "1d" or "1mo"
         # if "1mon", then rebalance happens at the last market open day of the month
         self.interval = interval
@@ -98,3 +108,40 @@ class Rebalance:
             if weight_change > 0:
                 self.portfolio.add_security_weight(security, weight_change, iter_index)
         self.portfolio.append_holding_snapshot(iter_index)
+
+    def minimum_tracking_error_portfolio_weight(self, cur_date):
+        rb = RiskBreakdownToFactor(self.portfolio, self.benchmark, cur_date)
+        rb.calculate_stock_beta_against_factors()
+
+        benchmark_weight = np.asarray(rb.benchmark_weight)
+        n = len(benchmark_weight)
+        w = cp.Variable(n)
+
+        BFB = np.asmatrix(rb.beta.T) @ rb.F @ rb.beta
+        D = np.asmatrix(rb.idiosyncratic_variance)
+
+        risk = cp.quad_form(w - benchmark_weight, BFB) + cp.quad_form(
+            w - benchmark_weight, D
+        )
+        problem = cp.Problem(
+            cp.Minimize(risk),
+            [sum(w) == 1, w >= 0, w <= [1 if i > 0 else 0 for i in benchmark_weight]],
+        )
+        tracking_error = (problem.solve() * 12) ** 0.5
+
+        active_risk_i = []
+        for i in range(rb.F.shape[1]):
+            F_i = pd.DataFrame(0, rb.F.columns, rb.F.index)
+            F_i.iloc[:, i] = rb.F.iloc[:, i]
+            active_risk_i.append(
+                (w.value - rb.benchmark_weight)
+                @ (rb.beta.T)
+                @ (rb.F_i)
+                @ (rb.beta)
+                @ (w.value - rb.benchmark_weight)
+                * 12
+            )
+        active_risk_i = pd.Series(active_risk_i, rb.F.index)
+        active_factor_loading = (w.value - rb.benchmark_weight) @ rb.beta.T
+        factor_loading = pd.Series(w.value @ rb.beta.T)
+        return

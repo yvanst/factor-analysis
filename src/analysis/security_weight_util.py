@@ -4,7 +4,7 @@ from src.market import Market
 from src.security_symbol import SecuritySedol
 
 
-class RiskBreakdownWithWeight:
+class SecurityWeightUtil:
     def __init__(self, holding_snapshot, start_date, end_date):
         self.holding_snapshot: pl.DataFrame = holding_snapshot
         self.start_date = start_date
@@ -189,6 +189,6 @@ if __name__ == "__main__":
     )
     start_date = datetime.date(2012, 12, 31)
     end_date = datetime.date(2013, 10, 31)
-    risk_break = RiskBreakdownWithWeight(df, start_date, end_date)
+    risk_break = SecurityWeightUtil(df, start_date, end_date)
     # risk_break.risk_break_down_to_sector()
     risk_break.get_security_with_weight()
