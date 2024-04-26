@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import polars as pl
 import seaborn as sns
 
@@ -49,8 +50,11 @@ class RiskBreakdownToFactor:
         )
         self.ticker_return_df = ticker_return_df
         factor_orth = self.get_orthogonalized_factor(use_intercept=False)
-        residual, beta = self.regress(factor_orth, ticker_return_df.select(ticker_cols))
-        exlcude_cols = [
+        residual, beta = self.regress(
+            factor_orth, ticker_return_df.select(ticker_cols).to_pandas()
+        )
+        # TODO: how to maintain order
+        index = [
             "benchmark_return",
             "Consumer Discretionary",
             "Energy",
@@ -64,12 +68,16 @@ class RiskBreakdownToFactor:
             "Consumer Staples",
             "Financials",
         ]
-        idiosyncratic_variance = residual.drop(exlcude_cols).select(
-            pl.all().pow(2).sum() / (self.month_range - len(exlcude_cols))
+        sector_list = index[1:]
+        K = len(index)
+
+        idiosyncratic_variance = residual.drop(index, axis=1).apply(
+            lambda x: sum(x**2) / (self.month_range - K), axis=0
         )
-        idiosyncratic_variance = pl.DataFrame(
-            np.diag(idiosyncratic_variance.to_numpy().reshape(-1)),
-            schema=idiosyncratic_variance.schema,
+        idiosyncratic_variance = pd.DataFrame(
+            np.diag(idiosyncratic_variance),
+            idiosyncratic_variance.index,
+            idiosyncratic_variance.index,
         )
 
         risk_breakdown_with_weight = RiskBreakdownWithWeight(
@@ -78,32 +86,28 @@ class RiskBreakdownToFactor:
         security_weight = (
             risk_breakdown_with_weight.get_security_with_weight()
             .sort(pl.col("security"))
-            .select("portfolio_weight", "benchmark_weight", "active_weight")
-            .fill_null(0)
+            .fill_null(0)  # TODO
+            .to_pandas()
+            .drop("date", axis=1)
+            .set_index("security")
         )
         # TODO: why nan
-        beta_numpy = beta.fill_nan(0).to_numpy()
-        security_weight_numpy = security_weight.to_numpy()
-        factor_loading = beta_numpy.dot(security_weight_numpy)
-        factor_loading = pl.DataFrame(factor_loading, schema=security_weight.schema)
+        beta = beta.fillna(0)
+        factor_loading = beta.dot(security_weight)
 
-        #### total risk attribution
-        portfolio_weight = security_weight.get_column("portfolio_weight").to_numpy()
-        F = factor_orth.to_pandas().cov()
+        #### total risk attribution 1
+        F = factor_orth.cov()
+        portfolio_weight = security_weight["portfolio_weight"]
         systematic_risk = (
-            portfolio_weight.dot(beta_numpy.transpose())
-            .dot(F)
-            .dot(beta_numpy)
-            .dot(portfolio_weight)
-            * 12
+            portfolio_weight.dot(beta.T).dot(F).dot(beta).dot(portfolio_weight) * 12
         )
-        idiosyncratic_variance_numpy = idiosyncratic_variance.fill_nan(0).to_numpy()
+        # TODO:
+        idiosyncratic_variance = idiosyncratic_variance.fillna(0)
         stock_specific_risk = (
-            portfolio_weight.dot(idiosyncratic_variance_numpy).dot(portfolio_weight)
-            * 12
+            portfolio_weight.dot(idiosyncratic_variance).dot(portfolio_weight) * 12
         )
         total_risk = np.sqrt(systematic_risk + stock_specific_risk)
-        total_risk_df1 = pl.DataFrame(
+        total_risk_attribution_df1 = pl.DataFrame(
             {
                 "total_risk": total_risk,
                 "systematic_risk": systematic_risk,
@@ -111,8 +115,102 @@ class RiskBreakdownToFactor:
             }
         )
 
-        #### total risk attribution
+        #### total risk attribution 2
+        F_benchmark = F.loc[
+            np.isin(F.index.values, ["benchmark_return"]), "benchmark_return"
+        ].to_frame()
+        beta_benchmark = beta.loc[np.isin(beta.index.values, "benchmark_return"), :]
+        total_risk_benchmark = (
+            portfolio_weight.dot(beta_benchmark.T)
+            .dot(F_benchmark)
+            .dot(beta_benchmark)
+            .dot(portfolio_weight)
+            * 12
+        )
 
+        F_sector = F.loc[np.isin(F.index.values, sector_list), sector_list]
+        beta_sector = beta.loc[np.isin(beta.index.values, sector_list), :]
+        total_risk_sector = (
+            portfolio_weight.dot(beta_sector.T)
+            .dot(F_sector)
+            .dot(beta_sector)
+            .dot(portfolio_weight)
+            * 12
+        )
+        total_risk_attribution_df2 = pl.DataFrame(
+            {
+                "systematic_risk": systematic_risk,
+                "total_risk_benchmark": total_risk_benchmark,
+                "total_risk_sector": total_risk_sector,
+            }
+        )
+
+        #### total risk attribution 3
+        total_risk_i = []
+        for i in range(F.shape[1]):
+            F_i = pd.DataFrame(0, F.columns, F.index)
+            F_i.iloc[:, i] = F.iloc[:, i]
+            total_risk_i.append(
+                portfolio_weight.dot(beta.T).dot(F_i).dot(beta).dot(portfolio_weight)
+                * 12
+            )
+        total_risk_attribution_df3 = pd.Series(total_risk_i, F.index)
+
+        #### MCTR
+        V = (beta.T.dot(F).dot(beta) + idiosyncratic_variance) * 12
+        MCTR = V.dot(portfolio_weight) / total_risk
+
+        #### tracking error attribution 1
+        active_weight = security_weight["active_weight"]
+        systematic_active_risk = (
+            active_weight.dot(beta.T).dot(F).dot(beta).dot(active_weight) * 12
+        )
+        stock_specific_active_risk = (
+            active_weight.dot(idiosyncratic_variance).dot(active_weight) * 12
+        )
+        tracking_error = np.sqrt(systematic_active_risk + stock_specific_active_risk)
+        tracking_error_attribution_df1 = pl.DataFrame(
+            {
+                "systematic_active_risk": systematic_active_risk,
+                "stock_specific_active_risk": stock_specific_active_risk,
+                "tracking_error": tracking_error,
+            }
+        )
+
+        #### tracking error attribution 2
+        benchmark_active_risk = (
+            active_weight.dot(beta_benchmark.T)
+            .dot(F_benchmark)
+            .dot(beta_benchmark)
+            .dot(active_weight)
+            * 12
+        )
+        sector_active_risk = (
+            active_weight.dot(beta_sector.T)
+            .dot(F_sector)
+            .dot(beta_sector)
+            .dot(active_weight)
+            * 12
+        )
+        tracking_error_attribution_df2 = pl.DataFrame(
+            {
+                "systematic_active_risk": systematic_active_risk,
+                "benchmark_active_risk": benchmark_active_risk,
+                "sector_active_risk": sector_active_risk,
+            }
+        )
+        #### tracking error attribution 3
+        active_risk_i = []
+        for i in range(F.shape[1]):
+            F_i = pd.DataFrame(0, F.columns, F.index)
+            F_i.iloc[:, i] = F.iloc[:, i]
+            active_risk_i.append(
+                active_weight.dot(beta.T).dot(F_i).dot(beta).dot(active_weight) * 12
+            )
+        tracking_error_attribution_df3 = pd.Series(active_risk_i, F.index)
+
+        #### MCAR
+        MCAR = V.dot(active_weight) / tracking_error
         return
 
     def get_orthogonalized_factor(self, use_intercept=True):
@@ -136,8 +234,8 @@ class RiskBreakdownToFactor:
         self.benchmark_return_df = benchmark_return_df
         self.sector_return_df = sector_return_df
         factor_orth, beta = self.regress(
-            benchmark_return_df.select(benchmark_select),
-            sector_return_df.select(pl.all().exclude("date")),
+            benchmark_return_df.select(benchmark_select).to_pandas(),
+            sector_return_df.select(pl.all().exclude("date")).to_pandas(),
         )
 
         # factor_before = pl.concat(
@@ -233,13 +331,12 @@ class RiskBreakdownToFactor:
         )
         return security_df
 
-    def regress(self, X: pl.DataFrame, Y: pl.DataFrame):
-        X_inv = np.linalg.pinv(X.to_numpy())
-        B = X_inv.dot(Y.to_numpy())
-        residual = Y.to_numpy() - X.to_numpy().dot(B)
-        residual = pl.from_numpy(residual, schema=Y.schema)
-        factors = pl.concat([X, residual], how="horizontal")
-        return factors, pl.DataFrame(B, schema=Y.schema)
+    def regress(self, X: pd.DataFrame, Y: pd.DataFrame):
+        X_inv = pd.DataFrame(np.linalg.pinv(X.values), X.columns, X.index)
+        B = X_inv.dot(Y)
+        residual = Y - X.dot(B)
+        factors = pd.concat([X, residual], axis=1)
+        return factors, B
 
 
 if __name__ == "__main__":
