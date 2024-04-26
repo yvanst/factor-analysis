@@ -1,5 +1,5 @@
-from scipy.stats import norm
 import polars as pl
+from scipy.stats import norm
 
 
 class Var:

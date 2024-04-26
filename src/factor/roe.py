@@ -1,8 +1,8 @@
 import polars as pl
 
-from src.security_symbol import SecuritySedol
 from src.factor.base_factor import BaseFactor
 from src.impl.roe import RoeImpl
+from src.security_symbol import SecuritySedol
 
 
 class RoeFactor(BaseFactor):

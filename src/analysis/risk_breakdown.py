@@ -97,8 +97,9 @@ class RiskBreakdown:
 
 if __name__ == "__main__":
     import datetime
-    from src.market import Market
+
     from src.fund_universe import SECURITY_SEDOL
+    from src.market import Market
 
     cfg = pl.Config()
     cfg.set_tbl_rows(100)

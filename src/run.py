@@ -1,5 +1,8 @@
 import datetime
 
+from src.analysis.hit_rate import HitRate
+from src.analysis.information_coefficient import InformationCoefficient
+from src.analysis.metric import Metric
 from src.analysis.plot import Plot
 from src.backtest import BackTest
 from src.benchmark import Benchmark
@@ -7,9 +10,6 @@ from src.factor.cape import CapeFactor
 from src.factor.roe import RoeFactor
 from src.fund_universe import SECURITY_SEDOL
 from src.market import Market
-from src.analysis.hit_rate import HitRate
-from src.analysis.information_coefficient import InformationCoefficient
-from src.analysis.metric import Metric
 from src.portfolio import Portfolio
 from src.rebalance import Rebalance
 from src.security_symbol import SecurityTicker
