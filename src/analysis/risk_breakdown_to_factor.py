@@ -81,7 +81,38 @@ class RiskBreakdownToFactor:
             .select("portfolio_weight", "benchmark_weight", "active_weight")
             .fill_null(0)
         )
-        factor_loading = beta.to_numpy().dot(security_weight.to_numpy())
+        # TODO: why nan
+        beta_numpy = beta.fill_nan(0).to_numpy()
+        security_weight_numpy = security_weight.to_numpy()
+        factor_loading = beta_numpy.dot(security_weight_numpy)
+        factor_loading = pl.DataFrame(factor_loading, schema=security_weight.schema)
+
+        #### total risk attribution
+        portfolio_weight = security_weight.get_column("portfolio_weight").to_numpy()
+        F = factor_orth.to_pandas().cov()
+        systematic_risk = (
+            portfolio_weight.dot(beta_numpy.transpose())
+            .dot(F)
+            .dot(beta_numpy)
+            .dot(portfolio_weight)
+            * 12
+        )
+        idiosyncratic_variance_numpy = idiosyncratic_variance.fill_nan(0).to_numpy()
+        stock_specific_risk = (
+            portfolio_weight.dot(idiosyncratic_variance_numpy).dot(portfolio_weight)
+            * 12
+        )
+        total_risk = np.sqrt(systematic_risk + stock_specific_risk)
+        total_risk_df1 = pl.DataFrame(
+            {
+                "total_risk": total_risk,
+                "systematic_risk": systematic_risk,
+                "stock_specific_risk": stock_specific_risk,
+            }
+        )
+
+        #### total risk attribution
+
         return
 
     def get_orthogonalized_factor(self, use_intercept=True):
