@@ -1,3 +1,5 @@
+import datetime
+
 import polars as pl
 
 from src.market import Market
@@ -19,6 +21,27 @@ class Benchmark:
         df = df.select(
             pl.col("date"),
             (pl.col("value") / pl.lit(first_day_value) * pl.lit(100)).alias("value"),
+        )
+        return df
+
+    def get_performance_return_from_month_start(self):
+        self.market = Market(
+            [self.benchmark],
+            datetime.date(self.start_date.year, self.start_date.month, 1),
+            self.end_date,
+        )
+        df: pl.DataFrame = self.market.data[self.benchmark]
+        df = (
+            df.filter(pl.col("date") >= self.start_date - pl.duration(days=10))
+            .filter(pl.col("date") <= self.end_date)
+            .rename({"adj close": "value"})
+        )
+        df = (
+            df.with_columns(
+                (pl.col("value") / pl.col("value").shift(1) - 1).alias("return")
+            )
+            .filter(pl.col("date") >= self.start_date)
+            .select("date", "return")
         )
         return df
 

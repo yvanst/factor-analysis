@@ -4,20 +4,19 @@ import polars as pl
 
 
 class MonthlyPerformance:
-    def __init__(
-        self, potfolio_performance: pl.DataFrame, benchmark_performance: pl.DataFrame
-    ):
-        self.portfolio_performance = potfolio_performance
-        self.benchmark_performance = benchmark_performance
+    def __init__(self):
+        pass
 
-    def get_stat(self):
+    def get_annualized_stat(
+        self, portfolio_performance: pl.DataFrame, benchmark_performance: pl.DataFrame
+    ):
         portfolio_monthly_performance = (
-            self.get_monthly_performance(self.portfolio_performance)
+            self.get_monthly_performance(portfolio_performance)
             .select("date", "monthly_return")
             .rename({"monthly_return": "portfolio_monthly_return"})
         )
         benchmark_monthly_performance = (
-            self.get_monthly_performance(self.benchmark_performance)
+            self.get_monthly_performance(benchmark_performance)
             .select("date", "monthly_return")
             .rename({"monthly_return": "benchmark_monthly_return"})
         )
@@ -115,7 +114,7 @@ if __name__ == "__main__":
     benchmark = Benchmark(SecurityTicker("^SPX", "index"), start_date, end_date)
     benchmark_performance = benchmark.get_performance()
 
-    monthly_performance = MonthlyPerformance(
+    monthly_performance = MonthlyPerformance()
+    stat = monthly_performance.get_annualized_stat(
         portfolio_performance, benchmark_performance
     )
-    stat = monthly_performance.get_stat()
