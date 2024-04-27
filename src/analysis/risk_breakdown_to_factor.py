@@ -264,34 +264,24 @@ class RiskBreakdownToFactor:
 
         self.benchmark_return_df = benchmark_return_df
         self.sector_return_df = sector_return_df
+
+        factor_before = pd.concat(
+            [
+                benchmark_return_df.select(
+                    ["intercept", "benchmark_return"]
+                ).to_pandas(),
+                sector_return_df.select(pl.all().exclude("date")).to_pandas(),
+            ],
+            axis=1,
+        )
+        self.factor_before = factor_before.drop(labels="intercept", axis=1)
+
         factor_orth, beta = self.regress(
             benchmark_return_df.select(["intercept", "benchmark_return"]).to_pandas(),
             sector_return_df.select(pl.all().exclude("date")).to_pandas(),
         )
-        factor_orth = factor_orth.drop(labels="intercept", axis=1)
-
-        # factor_before = pl.concat(
-        #     [
-        #         benchmark_return_df.select(benchmark_select),
-        #         sector_return_df.select(pl.all().exclude("date")),
-        #     ],
-        #     how="horizontal",
-        # )
-        # heatmap_before = sns.heatmap(
-        #     factor_before.corr(),
-        #     annot=True,
-        #     xticklabels=factor_orth.columns,
-        #     yticklabels=factor_orth.columns,
-        # )
-        # heatmap_before.set_title("factor correlation before orthogonalization")
-        # heatmap = sns.heatmap(
-        #     factor_orth.corr(),
-        #     annot=True,
-        #     xticklabels=factor_orth.columns,
-        #     yticklabels=factor_orth.columns,
-        # )
-        # heatmap.set_title("factor correlation after orthogonalization")
-        return factor_orth
+        self.factor_orth = factor_orth.drop(labels="intercept", axis=1)
+        return self.factor_orth
 
     def get_sector_monthly_return_df(self):
         market = Market(
@@ -364,45 +354,36 @@ class RiskBreakdownToFactor:
         factors = pd.concat([X, residual], axis=1)
         return factors, B
 
+    def total_risk_breakdown(self):
+        pass
 
-if __name__ == "__main__":
-    import datetime
+    def tracking_error_breakdown(self):
+        pass
 
-    from src.backtest import BackTest
-    from src.benchmark import Benchmark
-    from src.factor.roe import RoeFactor
-    from src.fund_universe import SECURITY_SEDOL
-    from src.market import Market
-    from src.portfolio import Portfolio
-    from src.rebalance import Rebalance
-    from src.security_symbol import SecurityTicker
+    def plot_correlation(self):
+        factor_orth = self.factor_orth
+        factor_before = self.factor_before
 
-    cfg = pl.Config()
-    cfg.set_tbl_rows(100)
-    cfg.set_tbl_cols(100)
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+        corr = factor_before.corr()
+        corr = corr.where(corr > 1e-4, 0)
+        heatmap_before = sns.heatmap(
+            corr,
+            annot=True,
+            xticklabels=factor_before.columns,
+            yticklabels=factor_before.columns,
+            ax=axs[0],
+        )
+        heatmap_before.set_title("before orthogonalization")
 
-    start_date = datetime.date(2012, 12, 31)
-    end_date = datetime.date(2013, 10, 31)
-    security_universe = SECURITY_SEDOL
-    rebalance_period = 1
-    rebalance_interval = "1mo"
-    Factor = RoeFactor
-    market = Market(security_universe, start_date, end_date)
-    long_factor = Factor(security_universe, "long")
-    long_portfolio = Portfolio(100.0, start_date, end_date)
-    long_factor.set_portfolio_at_start(long_portfolio)
-
-    benchmark = Benchmark(SecurityTicker("^SPX", "index"), start_date, end_date)
-    rebalance = Rebalance(
-        rebalance_period, long_portfolio, long_factor, benchmark, rebalance_interval
-    )
-
-    backtest = BackTest(long_portfolio, market, rebalance)
-    backtest.run()
-    # benchmark_performance = benchmark.get_performance()
-
-    df = RiskBreakdownToFactor(
-        long_portfolio, benchmark, long_portfolio.end_date
-    ).calculate_stock_beta_against_factors()
-
-    print()
+        corr = factor_orth.corr()
+        corr = corr.where(corr > 1e-4, 0)
+        heatmap = sns.heatmap(
+            corr,
+            annot=True,
+            xticklabels=factor_orth.columns,
+            yticklabels=factor_orth.columns,
+            ax=axs[1],
+        )
+        heatmap.set_title("after orthogonalization")
+        plt.show()
