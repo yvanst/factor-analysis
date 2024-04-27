@@ -47,25 +47,19 @@ class MonthlyPerformance:
             pl.col("date").min().alias("range_start"),
             pl.col("date").max().alias("range_end"),
         )
+        monthly_performance = monthly_performance.with_columns(
+            pl.col("date").dt.month_start().alias("month_start")
+        ).join(month_end_date, on="month_start", how="inner")
+
         monthly_performance = (
-            monthly_performance.join(
-                month_end_date, left_on="date", right_on="range_start", how="left"
-            )
-            .join(month_end_date, left_on="date", right_on="range_end", how="left")
-            .filter(
-                (pl.col("range_start").is_not_null())
-                | (pl.col("range_end").is_not_null())
-            )
-        )
-        monthly_performance = (
-            monthly_performance.groupby(pl.col("date").dt.month_start().alias("date"))
+            monthly_performance.groupby(pl.col("month_start"))
             .agg(
-                pl.when(pl.col("range_start").is_not_null())
+                pl.when(pl.col("range_start") == pl.col("date"))
                 .then(pl.col("value"))
                 .otherwise(None)
                 .max()
                 .alias("month_start_value"),
-                pl.when(pl.col("range_end").is_not_null())
+                pl.when(pl.col("range_end") == pl.col("date"))
                 .then(pl.col("value"))
                 .otherwise(None)
                 .max()
@@ -78,45 +72,3 @@ class MonthlyPerformance:
             )
         )
         return monthly_performance
-
-
-if __name__ == "__main__":
-    import datetime
-
-    from src.backtest import BackTest
-    from src.benchmark import Benchmark
-    from src.factor.roe import RoeFactor
-    from src.fund_universe import SECURITY_SEDOL
-    from src.market import Market
-    from src.portfolio import Portfolio
-    from src.rebalance import Rebalance
-    from src.security_symbol import SecurityTicker
-
-    cfg = pl.Config()
-    cfg.set_tbl_rows(100)
-
-    start_date = datetime.date(2012, 12, 31)
-    end_date = datetime.date(2013, 10, 31)
-    security_universe = SECURITY_SEDOL
-    rebalance_period = 1
-    rebalance_interval = "1mo"
-    Factor = RoeFactor
-    market = Market(security_universe, start_date, end_date)
-    long_factor = Factor(security_universe, "long")
-    long_portfolio = Portfolio(100.0, start_date, end_date)
-    long_factor.set_portfolio_at_start(long_portfolio)
-
-    rebalance = Rebalance(
-        rebalance_period, long_portfolio, long_factor, rebalance_interval
-    )
-
-    backtest = BackTest(long_portfolio, market, rebalance)
-    backtest.run()
-    portfolio_performance = long_portfolio.value_book.select("date", "value")
-    benchmark = Benchmark(SecurityTicker("^SPX", "index"), start_date, end_date)
-    benchmark_performance = benchmark.get_performance()
-
-    monthly_performance = MonthlyPerformance()
-    stat = monthly_performance.get_annualized_stat(
-        portfolio_performance, benchmark_performance
-    )

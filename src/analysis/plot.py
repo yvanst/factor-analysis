@@ -77,8 +77,9 @@ class Plot:
             f"EQUAL",
         ]
         colors = ["tab:pink", "tab:green", "tab:red"]
-        for p, l, c in zip(portfolios, portfolio_labels, colors):
-            ax.plot(dates, p, label=l, color=c)
+        markers = ["s", "^", "o"]
+        for p, l, c, m in zip(portfolios, portfolio_labels, colors, markers):
+            ax.plot(dates, p, label=l, color=c, marker=m)
 
         ax.grid(True)
         ax.legend()
@@ -108,8 +109,9 @@ class Plot:
             f"EQUAL",
         ]
         colors = ["tab:pink", "tab:green", "tab:red"]
-        for p, l, c in zip(portfolios, portfolio_labels, colors):
-            ax.plot(dates, p, label=l, color=c)
+        markers = ["s", "^", "o"]
+        for p, l, c, m in zip(portfolios, portfolio_labels, colors, markers):
+            ax.plot(dates, p, label=l, color=c, marker=m)
 
         ax.grid(True)
         ax.legend()
