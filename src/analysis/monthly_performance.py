@@ -12,16 +12,16 @@ class MonthlyPerformance:
     ):
         portfolio_monthly_performance = (
             self.get_monthly_performance(portfolio_performance)
-            .select("date", "monthly_return")
+            .select("month_start", "monthly_return")
             .rename({"monthly_return": "portfolio_monthly_return"})
         )
         benchmark_monthly_performance = (
             self.get_monthly_performance(benchmark_performance)
-            .select("date", "monthly_return")
+            .select("month_start", "monthly_return")
             .rename({"monthly_return": "benchmark_monthly_return"})
         )
         stat_df = portfolio_monthly_performance.join(
-            benchmark_monthly_performance, on="date", how="inner"
+            benchmark_monthly_performance, on="month_start", how="inner"
         ).with_columns(
             (
                 pl.col("portfolio_monthly_return") - pl.col("benchmark_monthly_return")
@@ -41,7 +41,7 @@ class MonthlyPerformance:
         return stat_df
 
     def get_monthly_performance(self, monthly_performance: pl.DataFrame):
-        month_end_date = monthly_performance.groupby(
+        month_end_date = monthly_performance.group_by(
             pl.col("date").dt.month_start().alias("month_start")
         ).agg(
             pl.col("date").min().alias("range_start"),
@@ -52,7 +52,7 @@ class MonthlyPerformance:
         ).join(month_end_date, on="month_start", how="inner")
 
         monthly_performance = (
-            monthly_performance.groupby(pl.col("month_start"))
+            monthly_performance.group_by(pl.col("month_start"))
             .agg(
                 pl.when(pl.col("range_start") == pl.col("date"))
                 .then(pl.col("value"))

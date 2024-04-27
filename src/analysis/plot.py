@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+import pandas as pd
+
 from src.portfolio import Portfolio
 
 
@@ -117,3 +119,6 @@ class Plot:
         ax.legend()
         ax.set_title("Tracking Error")
         plt.show()
+
+    def plot_total_risk_breakdown(self):
+        pass
