@@ -23,16 +23,16 @@ class Plot:
 
     def draw(self):
         portfolios = [
-            self.equal_portfolio_value,
-            self.min_te_portfolio_value,
             self.mvo_portfolio_value,
+            self.min_te_portfolio_value,
+            self.equal_portfolio_value,
         ]
         portfolio_labels = [
-            f"EQUAL - {self.benchmark_label}",
-            f"MIN_TE - {self.benchmark_label}",
             f"MVO - {self.benchmark_label}",
+            f"MIN_TE - {self.benchmark_label}",
+            f"EQUAL - {self.benchmark_label}",
         ]
-        colors = ["tab:red", "tab:green", "tab:pink"]
+        colors = ["tab:pink", "tab:green", "tab:red"]
         for p, l, c in zip(portfolios, portfolio_labels, colors):
             relative_value = p - self.benchmark_value
             self.ax.plot(self.dates, relative_value, label=l, color=c)

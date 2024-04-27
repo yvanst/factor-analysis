@@ -5,8 +5,9 @@ from scipy.stats import norm
 class Var:
     def __init__(self, portfolio_performance):
         self.portfolio_performance: pl.DataFrame = portfolio_performance
-        self.hist_days = 1000
+        self.hist_days = portfolio_performance.shape[0]
         self.rolling_days_df = self.get_rolling_days_df()
+        self.pcts = [0.9, 0.95, 0.99]
 
     def get_rolling_days_df(self):
         portfolio_performance = (
@@ -63,10 +64,10 @@ class Var:
 
     def get_imperical_var(self):
         var = self.rolling_days_df
-        target_rows = [int(self.hist_days * (100 - pct) / 100) for pct in [99, 95, 90]]
+        target_rows = [int(self.hist_days * (1 - pct)) for pct in self.pcts]
         var = var.filter(pl.col("index").is_in(target_rows))
         var = pl.concat(
-            [var.sort("index"), pl.DataFrame({"pct": [0.99, 0.95, 0.9]})],
+            [var.sort("index", descending=True), pl.DataFrame({"pct": self.pcts})],
             how="horizontal",
         )
         var = var.select(
@@ -86,14 +87,13 @@ class Var:
             pl.col("21-day return").mean().alias("21-day mean"),
             pl.col("21-day return").std().alias("21-day std"),
         )
-        pcts = [0.9, 0.95, 0.99]
         one_day_return_series = [
             norm.ppf(
                 1 - pct,
                 loc=var.get_column("1-day mean").item(0),
                 scale=var.get_column("1-day std").item(0),
             )
-            for pct in pcts
+            for pct in self.pcts
         ]
         five_day_return_series = [
             norm.ppf(
@@ -101,7 +101,7 @@ class Var:
                 loc=var.get_column("5-day mean").item(0),
                 scale=var.get_column("5-day std").item(0),
             )
-            for pct in pcts
+            for pct in self.pcts
         ]
         ten_day_return_series = [
             norm.ppf(
@@ -109,7 +109,7 @@ class Var:
                 loc=var.get_column("10-day mean").item(0),
                 scale=var.get_column("10-day std").item(0),
             )
-            for pct in pcts
+            for pct in self.pcts
         ]
         twenty_one_day_return_series = [
             norm.ppf(
@@ -117,11 +117,11 @@ class Var:
                 loc=var.get_column("21-day mean").item(0),
                 scale=var.get_column("21-day std").item(0),
             )
-            for pct in pcts
+            for pct in self.pcts
         ]
         var = pl.DataFrame(
             {
-                "pct": pcts,
+                "pct": self.pcts,
                 "1-day return": one_day_return_series,
                 "5-day return": five_day_return_series,
                 "10-day return": ten_day_return_series,
@@ -143,5 +143,7 @@ if __name__ == "__main__":
     benchmark = Benchmark(SecurityTicker("^SPX", "index"), start_date, end_date)
     benchmark_performance = benchmark.get_performance()
     var = Var(benchmark_performance)
+    print("normal distribution:")
     print(var.get_normal_distribution_var())
+    print("imperical value:")
     print(var.get_imperical_var())

@@ -37,7 +37,7 @@ class Rebalance:
         if iter_index + 1 >= len(self.portfolio.date_df):
             return False
         if iter_index == 1 and self.weight_strategy != "EQUAL":
-            self.run(iter_index)
+            self.run(0)
             # do not refresh last rebalance index
             return False
 
