@@ -10,7 +10,7 @@ from src.analysis.security_weight_util import SecurityWeightUtil
 from src.benchmark import Benchmark
 from src.fund_universe import ISHARE_SECTOR_ETF_TICKER
 from src.market import Market
-from src.security_symbol import SecuritySedol
+from src.security_symbol import SecuritySedol, SecurityTicker
 
 
 class RiskBreakdownToFactor:
@@ -155,7 +155,7 @@ class RiskBreakdownToFactor:
         #### total risk attribution 3
         total_risk_i = []
         for i in range(F.shape[1]):
-            F_i = pd.DataFrame(0, F.columns, F.index)
+            F_i = pd.DataFrame(0.0, F.columns, F.index)
             F_i.iloc[:, i] = F.iloc[:, i]
             total_risk_i.append(
                 portfolio_weight.dot(beta.T).dot(F_i).dot(beta).dot(portfolio_weight)
@@ -210,7 +210,7 @@ class RiskBreakdownToFactor:
         #### tracking error attribution 3
         active_risk_i = []
         for i in range(F.shape[1]):
-            F_i = pd.DataFrame(0, F.columns, F.index)
+            F_i = pd.DataFrame(0.0, F.columns, F.index)
             F_i.iloc[:, i] = F.iloc[:, i]
             active_risk_i.append(
                 active_weight.dot(beta.T).dot(F_i).dot(beta).dot(active_weight) * 12

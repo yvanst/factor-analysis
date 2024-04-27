@@ -19,15 +19,25 @@ end_date = datetime.date(2023, 10, 31)
 security_universe = SECURITY_SEDOL
 rebalance_period = 1
 rebalance_interval = "1mo"
+weight_strategy = "MIN_TE"
 Factor = RoeFactor
 market = Market(security_universe, start_date, end_date)
+benchmark = Benchmark(SecurityTicker("^SPX", "index"), start_date, end_date)
+benchmark_performance = benchmark.get_performance()
 
 ### Long factor
 long_factor = Factor(security_universe, "long")
 long_portfolio = Portfolio(100.0, start_date, end_date)
 long_factor.set_portfolio_at_start(long_portfolio)
 
-rebalance = Rebalance(rebalance_period, long_portfolio, long_factor, rebalance_interval)
+rebalance = Rebalance(
+    rebalance_period,
+    long_portfolio,
+    long_factor,
+    benchmark,
+    rebalance_interval,
+    weight_strategy,
+)
 
 backtest = BackTest(long_portfolio, market, rebalance)
 backtest.run()
@@ -38,16 +48,19 @@ short_portfolio = Portfolio(100.0, start_date, end_date)
 short_factor.set_portfolio_at_start(short_portfolio)
 
 rebalance = Rebalance(
-    rebalance_period, short_portfolio, short_factor, rebalance_interval
+    rebalance_period,
+    short_portfolio,
+    short_factor,
+    benchmark,
+    rebalance_interval,
+    weight_strategy,
 )
 
 backtest = BackTest(short_portfolio, market, rebalance)
 backtest.run()
 
 ### plot
-benchmark = Benchmark(SecurityTicker("^SPX", "index"), start_date, end_date)
 
-benchmark_performance = benchmark.get_performance()
 
 # metric = Metric(long_portfolio, benchmark_performance)
 # print(f"portfolio annulized return: {metric.portfolio_annualized_return()}")
