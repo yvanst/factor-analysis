@@ -4,6 +4,8 @@ from collections import defaultdict
 import numpy as np
 import polars as pl
 
+from src.analysis.risk_breakdown_to_factor import RiskBreakdownToFactor
+
 
 class Portfolio:
     def __init__(self, initial_cash, start_date, end_date):
@@ -12,7 +14,11 @@ class Portfolio:
         self.end_date = self.date_df.item(-1, 0)
         self.iter_index = 0
         self.holding_snapshots = dict()
-
+        self.total_risk_df = None
+        self.total_risk_break_down_df = None
+        self.tracking_error_df = None
+        self.tracking_error_breakdown_df = None
+        self.latest_risk_analysis = None
         self.security_book = defaultdict(self.empty_security_book)
         num = len(self.date_df)
         self.value_book = (
@@ -151,3 +157,55 @@ class Portfolio:
         self.holding_snapshots[cur_date] = pl.DataFrame(
             {"security": security_list, "weight": weight_list, "date": cur_date}
         )
+
+    def update_risk_analysis_df(self, rb: RiskBreakdownToFactor, cur_date):
+        new_total_risk_df = rb.total_risk_df.with_columns(
+            pl.lit(cur_date).alias("date")
+        )
+        if self.total_risk_df is None:
+            self.total_risk_df = new_total_risk_df
+        else:
+            self.total_risk_df = pl.concat(
+                [
+                    self.total_risk_df,
+                    new_total_risk_df.select(self.total_risk_df.columns),
+                ],
+                how="vertical",
+            )
+
+        new_tracking_error_df = rb.tracking_error_df.with_columns(
+            pl.lit(cur_date).alias("date")
+        )
+        if self.tracking_error_df is None:
+            self.tracking_error_df = new_tracking_error_df
+        else:
+            self.tracking_error_df = pl.concat(
+                [
+                    self.tracking_error_df,
+                    new_tracking_error_df.select(self.tracking_error_df.columns),
+                ],
+                how="vertical",
+            )
+
+        new_total_risk_breakdown_df = rb.total_risk_breakdown_df.with_columns(
+            pl.lit(cur_date).alias("date")
+        )
+        if self.total_risk_break_down_df is None:
+            self.total_risk_break_down_df = new_total_risk_breakdown_df
+        else:
+            self.total_risk_break_down_df = pl.concat(
+                [self.total_risk_break_down_df, new_total_risk_breakdown_df],
+                how="vertical",
+            )
+
+        new_tracking_error_breakdown_df = rb.tracking_error_breakdown_df.with_columns(
+            pl.lit(cur_date).alias("date")
+        )
+        if self.tracking_error_breakdown_df is None:
+            self.tracking_error_breakdown_df = new_tracking_error_breakdown_df
+        else:
+            self.tracking_error_breakdown_df = pl.concat(
+                [self.tracking_error_breakdown_df, new_tracking_error_breakdown_df],
+                how="vertical",
+            )
+        self.latest_risk_analysis = rb

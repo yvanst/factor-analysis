@@ -77,10 +77,16 @@ class Rebalance:
             new_position = self.minimum_tracking_error_portfolio_weight(cur_date)
             self.set_position(iter_index, cur_date, new_position)
             self.portfolio.update_holding_snapshot(iter_index, new_position)
+            # after rebalance, run risk analysis
+            rb = RiskBreakdownToFactor(self.portfolio, self.benchmark, cur_date)
+            self.portfolio.update_risk_analysis_df(rb, cur_date)
         elif self.weight_strategy == "MVO":
             new_position = self.mvo_portfolio_weight(cur_date)
             self.set_position(iter_index, cur_date, new_position)
             self.portfolio.update_holding_snapshot(iter_index, new_position)
+            # after rebalance, run risk analysis
+            rb = RiskBreakdownToFactor(self.portfolio, self.benchmark, cur_date)
+            self.portfolio.update_risk_analysis_df(rb, cur_date)
         else:
             raise ValueError(f"no weight strategy for {self.weight_strategy}")
 

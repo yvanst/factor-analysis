@@ -118,13 +118,7 @@ class RiskBreakdownToFactor:
             portfolio_weight.dot(idiosyncratic_variance).dot(portfolio_weight) * 12
         )
         total_risk = np.sqrt(systematic_risk + stock_specific_risk)
-        self.total_risk_attribution_df1 = pl.DataFrame(
-            {
-                "total_risk": total_risk,
-                "systematic_risk": systematic_risk,
-                "stock_specific_risk": stock_specific_risk,
-            }
-        )
+        self.total_risk = total_risk
 
         #### total risk attribution 2
         F_benchmark = F.loc[
@@ -148,13 +142,6 @@ class RiskBreakdownToFactor:
             .dot(portfolio_weight)
             * 12
         )
-        self.total_risk_attribution_df2 = pl.DataFrame(
-            {
-                "systematic_risk": systematic_risk,
-                "market_risk": total_risk_benchmark,
-                "sector_risk": total_risk_sector,
-            }
-        )
 
         #### total risk attribution 3
         total_risk_i = []
@@ -165,8 +152,8 @@ class RiskBreakdownToFactor:
                 portfolio_weight.dot(beta.T).dot(F_i).dot(beta).dot(portfolio_weight)
                 * 12
             )
-        self.total_risk_attribution_df3 = pd.Series(total_risk_i, F.index).to_frame(
-            "value"
+        self.total_risk_breakdown_df = pl.from_pandas(
+            pd.Series(total_risk_i, F.index).to_frame("value").transpose()
         )
 
         #### MCTR
@@ -183,13 +170,7 @@ class RiskBreakdownToFactor:
             active_weight.dot(idiosyncratic_variance).dot(active_weight) * 12
         )
         tracking_error = np.sqrt(systematic_active_risk + stock_specific_active_risk)
-        self.tracking_error_attribution_df1 = pl.DataFrame(
-            {
-                "tracking_error": tracking_error,
-                "systematic_active_risk": systematic_active_risk,
-                "stock_specific_active_risk": stock_specific_active_risk,
-            }
-        )
+        self.tracking_error = tracking_error
 
         #### tracking error attribution 2
         benchmark_active_risk = (
@@ -206,13 +187,7 @@ class RiskBreakdownToFactor:
             .dot(active_weight)
             * 12
         )
-        self.tracking_error_attribution_df2 = pl.DataFrame(
-            {
-                "systematic_active_risk": systematic_active_risk,
-                "market_active_risk": benchmark_active_risk,
-                "sector_active_risk": sector_active_risk,
-            }
-        )
+
         #### tracking error attribution 3
         active_risk_i = []
         for i in range(F.shape[1]):
@@ -221,12 +196,32 @@ class RiskBreakdownToFactor:
             active_risk_i.append(
                 active_weight.dot(beta.T).dot(F_i).dot(beta).dot(active_weight) * 12
             )
-        self.tracking_error_attribution_df3 = pd.Series(
-            active_risk_i, F.index
-        ).to_frame("value")
+        self.tracking_error_breakdown_df = pl.from_pandas(
+            pd.Series(active_risk_i, F.index).to_frame("value").transpose()
+        )
 
         #### MCAR
         self.MCAR = V.dot(active_weight) / tracking_error
+
+        self.total_risk_df = pl.DataFrame(
+            {
+                "total_risk": total_risk,
+                "systematic_risk": systematic_risk,
+                "stock_specific_risk": stock_specific_risk,
+                "market_risk": total_risk_benchmark,
+                "sector_risk": total_risk_sector,
+            }
+        )
+
+        self.tracking_error_df = pl.DataFrame(
+            {
+                "tracking_error": tracking_error,
+                "systematic_active_risk": systematic_active_risk,
+                "stock_specific_active_risk": stock_specific_active_risk,
+                "market_active_risk": benchmark_active_risk,
+                "sector_active_risk": sector_active_risk,
+            }
+        )
         return
 
     def get_ticker_return_df(self):
