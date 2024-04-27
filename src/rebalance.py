@@ -18,7 +18,7 @@ class Rebalance:
         factor: BaseFactor,
         benchmark: Benchmark,
         interval="1d",
-        weight_strategy="equal_weight",
+        weight_strategy="EQUAL",
         disable_rebalance=False,
     ) -> None:
         self.period = period

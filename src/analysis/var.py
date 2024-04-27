@@ -13,7 +13,7 @@ class Var:
         portfolio_performance = (
             self.portfolio_performance.sort(pl.col("date"), descending=True)
             .with_row_index(name="index", offset=0)
-            .filter(pl.col("index") < self.hist_days + 22)
+            .filter(pl.col("index") < 1000)
         )
         portfolio_performance = portfolio_performance.sort(pl.col("date"))
         portfolio_performance = portfolio_performance.with_columns(
@@ -21,36 +21,32 @@ class Var:
         )
         one_day_return_series = (
             portfolio_performance.sort(pl.col("date"), descending=True)
-            .filter(pl.col("index") < self.hist_days)
             .get_column("1-day return")
-            .sort()
+            .sort(nulls_last=True)
         )
         five_day_return_series = (
             portfolio_performance.rolling(index_column="date", period="5d")
             .agg(((pl.col("1-day return") + 1).product() - 1).alias("5-day return"))
             .sort(pl.col("date"), descending=True)
             .with_row_index(name="index", offset=0)
-            .filter(pl.col("index") < self.hist_days)
             .get_column("5-day return")
-            .sort()
+            .sort(nulls_last=True)
         )
         ten_day_return_series = (
             portfolio_performance.rolling(index_column="date", period="10d")
             .agg(((pl.col("1-day return") + 1).product() - 1).alias("10-day return"))
             .sort(pl.col("date"), descending=True)
             .with_row_index(name="index", offset=0)
-            .filter(pl.col("index") < self.hist_days)
             .get_column("10-day return")
-            .sort()
+            .sort(nulls_last=True)
         )
         twenty_one_day_return_series = (
             portfolio_performance.rolling(index_column="date", period="21d")
             .agg(((pl.col("1-day return") + 1).product() - 1).alias("21-day return"))
             .sort(pl.col("date"), descending=True)
             .with_row_index(name="index", offset=0)
-            .filter(pl.col("index") < self.hist_days)
             .get_column("21-day return")
-            .sort()
+            .sort(nulls_last=True)
         )
         rolling_days_df = pl.DataFrame(
             [
@@ -59,7 +55,7 @@ class Var:
                 ten_day_return_series,
                 twenty_one_day_return_series,
             ]
-        ).with_row_index(name="index", offset=1)
+        ).with_row_index(name="index", offset=0)
         return rolling_days_df
 
     def get_imperical_var(self):

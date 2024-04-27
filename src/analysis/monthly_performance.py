@@ -28,9 +28,11 @@ class MonthlyPerformance:
             ).alias("relative_monthly_return")
         )
         stat_df = stat_df.select(
-            (pl.col("portfolio_monthly_return").mean() * 12).alias("annualized_return"),
+            (pl.col("portfolio_monthly_return").mean() * 12).alias(
+                "monthly_averaged_return(annualized)"
+            ),
             (pl.col("portfolio_monthly_return").std() * math.sqrt(12)).alias(
-                "annualized_volatility"
+                "monthly_averaged_volatility(annualized)"
             ),
             (pl.col("relative_monthly_return").std() * math.sqrt(12)).alias(
                 "tracking_error"
