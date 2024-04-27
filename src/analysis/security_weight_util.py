@@ -13,17 +13,16 @@ class SecurityWeightUtil:
             pl.scan_parquet("parquet/base/us_sector_info.parquet")
             .filter(pl.col("date") >= start_date)
             .filter(pl.col("date") <= end_date)
-            .select(["sedol7", "sector"])
             .collect()
         )
         self.benchmark_sector_weight_df = self.benchmark_sector_construction()
 
-    def get_snapshot_holding_sector_and_forward_return(self):
-        market = Market(
-            [SecuritySedol(holding_snapshot.get_column("security").item(0))],
-            self.start_date,
-            self.end_date,
-        )
+    def get_snapshot_holding_sector(self):
+        # market = Market(
+        #     [SecuritySedol(self.holding_snapshot.get_column("security").item(0))],
+        #     self.start_date,
+        #     self.end_date,
+        # )
         holding_snapshot = self.holding_snapshot.join(
             self.sector_info_df.filter(pl.col("date").dt.year() == self.end_date.year)
             .filter(pl.col("date").dt.month() == self.end_date.month)
@@ -31,23 +30,23 @@ class SecurityWeightUtil:
             on="security",
             how="inner",
         )
-        holding_snapshot = holding_snapshot.with_columns(
-            pl.col("date").dt.month_end().alias("forward_start_date"),
-            (pl.col("date").dt.month_end() + pl.duration(days=1))
-            .dt.month_end()
-            .alias("forward_end_date"),
-        )
-        holding_snapshot = holding_snapshot.with_columns(
-            pl.struct(["security", "forward_start_date", "forward_end_date"])
-            .map_elements(
-                lambda x: market.query_sedol_range_return(
-                    x["security"],
-                    x["forward_start_date"],
-                    x["forward_end_date"],
-                )
-            )
-            .alias("forward_1mo_return")
-        )
+        # holding_snapshot = holding_snapshot.with_columns(
+        #     pl.col("date").dt.month_end().alias("forward_start_date"),
+        #     (pl.col("date").dt.month_end() + pl.duration(days=1))
+        #     .dt.month_end()
+        #     .alias("forward_end_date"),
+        # )
+        # holding_snapshot = holding_snapshot.with_columns(
+        #     pl.struct(["security", "forward_start_date", "forward_end_date"])
+        #     .map_elements(
+        #         lambda x: market.query_sedol_range_return(
+        #             x["security"],
+        #             x["forward_start_date"],
+        #             x["forward_end_date"],
+        #         )
+        #     )
+        #     .alias("forward_1mo_return")
+        # )
         assert len(holding_snapshot) == 20
         return holding_snapshot
 
@@ -82,8 +81,8 @@ class SecurityWeightUtil:
         assert sector_weight_df.get_column("benchmark_weight").sum() - 1 < 1e-5
         return sector_weight_df
 
-    def risk_break_down_to_sector(self):
-        holding_snapshot = self.get_snapshot_holding_sector_and_forward_return()
+    def security_weight_to_sector(self):
+        holding_snapshot = self.get_snapshot_holding_sector()
         holding_snapshot = holding_snapshot.group_by("sector").agg(
             pl.col("weight").sum().alias("portfolio_weight"),
         )

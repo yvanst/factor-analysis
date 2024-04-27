@@ -354,11 +354,103 @@ class RiskBreakdownToFactor:
         factors = pd.concat([X, residual], axis=1)
         return factors, B
 
-    def total_risk_breakdown(self):
-        pass
+    def portfolio_weight_analysis(self):
+        #### weight
+        sector_weight_df = (
+            SecurityWeightUtil(self.holding_snapshot, self.start_date, self.end_date)
+            .security_weight_to_sector()
+            .to_pandas()
+            .set_index("sector")
+        )
+        sector_weight_df = sector_weight_df * 100
+        sector_weight_df = sector_weight_df.rename(
+            columns={
+                "portfolio_weight": "portfolio_weight(%)",
+                "benchmark_weight": "benchmark_weight(%)",
+                "active_weight": "active_weight(%)",
+            }
+        )
+        return sector_weight_df
 
-    def tracking_error_breakdown(self):
-        pass
+    def total_risk_breakdown_analysis(self):
+        sector_weight_df = self.portfolio_weight_analysis()
+
+        table = pd.concat(
+            [
+                self.total_risk_breakdown_df.to_pandas().transpose(),
+                self.total_risk_df.to_pandas().transpose(),
+            ],
+            axis=0,
+        ).rename(columns={0: "total_risk"})
+        table["contribution"] = table["total_risk"] / np.power(self.total_risk, 2)
+        table["contribution"] = table["contribution"].where(
+            table["contribution"] < 1, 1
+        )
+        table["contribution"] = table["contribution"] * 100
+        table = table.rename(columns={"contribution": "contribution(%)"})
+        table = table.loc[
+            [
+                "total_risk",
+                "systematic_risk",
+                "stock_specific_risk",
+                "market_risk",
+                "sector_risk",
+                "Consumer Discretionary",
+                "Energy",
+                "Real Estate",
+                "Materials",
+                "Utilities",
+                "Information Technology",
+                "Communication Services",
+                "Health Care",
+                "Industrials",
+                "Consumer Staples",
+                "Financials",
+            ]
+        ]
+        res = table.join(sector_weight_df)
+        return res
+
+    def tracking_error_breakdown_analysis(self):
+        sector_weight_df = self.portfolio_weight_analysis()
+
+        table = pd.concat(
+            [
+                self.tracking_error_df.to_pandas().transpose(),
+                self.tracking_error_breakdown_df.to_pandas().transpose(),
+            ],
+            axis=0,
+        ).rename(columns={0: "tracking_error"})
+        table["contribution"] = table["tracking_error"] / np.power(
+            self.tracking_error, 2
+        )
+        table["contribution"] = table["contribution"].where(
+            table["contribution"] < 1, 1
+        )
+        table["contribution"] = table["contribution"] * 100
+        table = table.rename(columns={"contribution": "contribution(%)"})
+        table = table.loc[
+            [
+                "tracking_error",
+                "systematic_active_risk",
+                "stock_specific_active_risk",
+                "market_active_risk",
+                "sector_active_risk",
+                "Consumer Discretionary",
+                "Energy",
+                "Real Estate",
+                "Materials",
+                "Utilities",
+                "Information Technology",
+                "Communication Services",
+                "Health Care",
+                "Industrials",
+                "Consumer Staples",
+                "Financials",
+            ]
+        ]
+        res = table.join(sector_weight_df)
+        return res
 
     def plot_correlation(self):
         factor_orth = self.factor_orth

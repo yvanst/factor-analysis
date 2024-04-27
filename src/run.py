@@ -9,6 +9,7 @@ from src.market import Market
 from src.portfolio import Portfolio
 from src.rebalance import Rebalance
 from src.security_symbol import SecurityTicker
+from src.analysis.risk_breakdown_to_factor import RiskBreakdownToFactor
 
 start_date = datetime.date(2015, 8, 30)
 end_date = datetime.date(2015, 10, 31)
@@ -39,6 +40,10 @@ rebalance = Rebalance(
 backtest = BackTest(equal_portfolio, market, rebalance)
 backtest.run()
 
+# rb = RiskBreakdownToFactor(equal_portfolio, benchmark, end_date)
+# rb.tracking_error_breakdown_analysis()
+# rb.total_risk_breakdown_analysis()
+# rb.plot_correlation()
 
 ### minimum tracking error factor
 min_te_factor = Factor(security_universe, "long")
@@ -84,12 +89,5 @@ plot = Plot(
     benchmark_performance,
     "SPX",
 )
-plot.draw()
-
-# ie = InformationCoefficient(long_portfolio, long_factor, market, rebalance_period)
-# ie.get_information_coefficient()
-# ie.draw()
-
-# hr = HitRate(long_portfolio, long_factor, market, rebalance_period, benchmark)
-# hr.get_hit_rate()
-# hr.draw()
+plot.plot_total_risk()
+plot.plot_performance()
