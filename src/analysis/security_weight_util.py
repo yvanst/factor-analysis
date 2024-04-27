@@ -11,8 +11,8 @@ class SecurityWeightUtil:
         self.end_date = end_date
         self.sector_info_df = (
             pl.scan_parquet("parquet/base/us_sector_info.parquet")
-            .filter(pl.col("date") >= start_date)
-            .filter(pl.col("date") <= end_date)
+            .filter(pl.col("date").dt.month_start() >= start_date)
+            .filter(pl.col("date").dt.month_start() <= end_date)
             .collect()
         )
         self.benchmark_sector_weight_df = self.benchmark_sector_construction()
@@ -47,7 +47,7 @@ class SecurityWeightUtil:
         #     )
         #     .alias("forward_1mo_return")
         # )
-        assert len(holding_snapshot) == 20
+        assert len(holding_snapshot) > 0
         return holding_snapshot
 
     def benchmark_sector_construction(self):

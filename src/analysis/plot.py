@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from src.analysis.risk_breakdown_to_factor import RiskBreakdownToFactor
 from src.portfolio import Portfolio
 
 
@@ -10,14 +11,14 @@ class Plot:
         equal_portfolio: Portfolio,
         min_te_portfolio: Portfolio,
         mvo_portfolio: Portfolio,
-        benchmark,
+        benchmark_performance,
         benchmark_label,
     ):
         self.equal_portfolio = equal_portfolio
         self.min_te_portfolio = min_te_portfolio
         self.mvo_portfolio = mvo_portfolio
         self.dates = equal_portfolio.date_df.get_column("date")
-        self.benchmark_value = benchmark.get_column("value")
+        self.benchmark_value = benchmark_performance.get_column("value")
         self.benchmark_label = benchmark_label
 
     def plot_performance(self):
@@ -120,5 +121,70 @@ class Plot:
         ax.set_title("Tracking Error")
         plt.show()
 
-    def plot_total_risk_breakdown(self):
-        pass
+    def plot_total_risk_breakdown(self, benchmark, snapshot_date):
+        equal_portfolio_value = (
+            RiskBreakdownToFactor(self.equal_portfolio, benchmark, snapshot_date)
+            .total_risk_breakdown_analysis()["contribution(%)"]
+            .to_frame()
+            .transpose()
+        )
+        equal_portfolio_value["index"] = "equal_weight"
+
+        min_te_portfolio_value = (
+            RiskBreakdownToFactor(self.min_te_portfolio, benchmark, snapshot_date)
+            .total_risk_breakdown_analysis()["contribution(%)"]
+            .to_frame()
+            .transpose()
+        )
+        min_te_portfolio_value["index"] = "min_te"
+
+        mvo_portfolio_value = (
+            RiskBreakdownToFactor(self.mvo_portfolio, benchmark, snapshot_date)
+            .total_risk_breakdown_analysis()["contribution(%)"]
+            .to_frame()
+            .transpose()
+        )
+        mvo_portfolio_value["index"] = "mvo"
+
+        df = pd.concat(
+            [equal_portfolio_value, min_te_portfolio_value, mvo_portfolio_value], axis=0
+        ).set_index("index")
+        df = df.transpose()
+        ax = df.plot.barh()
+        ax.set_title("total risk contribution(%)")
+        plt.show()
+        return
+
+    def plot_tracking_error_breakdown(self, benchmark, snapshot_date):
+        equal_portfolio_value = (
+            RiskBreakdownToFactor(self.equal_portfolio, benchmark, snapshot_date)
+            .tracking_error_breakdown_analysis()["contribution(%)"]
+            .to_frame()
+            .transpose()
+        )
+        equal_portfolio_value["index"] = "equal_weight"
+
+        min_te_portfolio_value = (
+            RiskBreakdownToFactor(self.min_te_portfolio, benchmark, snapshot_date)
+            .tracking_error_breakdown_analysis()["contribution(%)"]
+            .to_frame()
+            .transpose()
+        )
+        min_te_portfolio_value["index"] = "min_te"
+
+        mvo_portfolio_value = (
+            RiskBreakdownToFactor(self.mvo_portfolio, benchmark, snapshot_date)
+            .tracking_error_breakdown_analysis()["contribution(%)"]
+            .to_frame()
+            .transpose()
+        )
+        mvo_portfolio_value["index"] = "mvo"
+
+        df = pd.concat(
+            [equal_portfolio_value, min_te_portfolio_value, mvo_portfolio_value], axis=0
+        ).set_index("index")
+        df = df.transpose()
+        ax = df.plot.barh()
+        ax.set_title("tracking error contribution(%)")
+        plt.show()
+        return
