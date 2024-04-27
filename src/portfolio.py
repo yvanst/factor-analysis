@@ -149,10 +149,6 @@ class Portfolio:
             security_list.append(security.sedol_id)
             weight_list.append(weight)
         cur_date = self.date_df.item(iter_index, 0)
-        if cur_date.month == 12:
-            cur_month = datetime.date(cur_date.year + 1, 1, 1)
-        else:
-            cur_month = datetime.date(cur_date.year, cur_date.month + 1, 1)
-        self.holding_snapshots[cur_month] = pl.DataFrame(
+        self.holding_snapshots[cur_date] = pl.DataFrame(
             {"security": security_list, "weight": weight_list, "date": cur_date}
         )

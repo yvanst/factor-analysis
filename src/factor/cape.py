@@ -14,3 +14,6 @@ class CapeFactor(BaseFactor):
         security_list = list(CapeImpl().get_security_list(date))
         security_list = [SecuritySedol(id) for id in security_list]
         return security_list
+
+    def get_security_score(self, date):
+        raise NotImplementedError()

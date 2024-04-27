@@ -144,4 +144,44 @@ class Rebalance:
         active_risk_i = pd.Series(active_risk_i, rb.F.index)
         active_factor_loading = (w.value - rb.benchmark_weight) @ rb.beta.T
         factor_loading = pd.Series(w.value @ rb.beta.T)
-        return
+        return w
+
+    def mvo_portfolio_weight(self, cur_date):
+        rb = RiskBreakdownToFactor(self.portfolio, self.benchmark, cur_date)
+        rb.calculate_stock_beta_against_factors()
+
+        alpha: pd.DataFrame = (
+            self.factor.get_security_score(cur_date)
+            .rename({"sedol7": "sedol_id", "z-score": "score"})
+            .select(pl.col("sedol_id", "score"))
+            .to_pandas()
+            .set_index("sedol_id")
+        )
+        alpha = alpha.merge(
+            rb.security_weight, how="right", left_index=True, right_index=True
+        )
+        alpha.loc[alpha["portfolio_weight"] == 0, "score"] = 0
+
+        benchmark_weight = np.asarray(rb.benchmark_weight)
+        portfolio_weight = np.asarray(rb.portfolio_weight)
+        n = len(benchmark_weight)
+        w = cp.Variable(n)
+
+        BFB = np.asmatrix(rb.beta.T) @ rb.F @ rb.beta
+        D = np.asmatrix(rb.idiosyncratic_variance)
+
+        risk = cp.quad_form(w - benchmark_weight, BFB) + cp.quad_form(
+            w - benchmark_weight, D
+        )
+        rtn = w @ np.asarray(alpha["score"])
+        problem = cp.Problem(
+            cp.Minimize(-rtn),
+            [
+                sum(w) == 1,
+                w >= 0,
+                w <= [1 if i > 0 else 0 for i in portfolio_weight],
+                risk <= 0.01 / 12,
+            ],
+        )
+        problem.sovle()
+        return w

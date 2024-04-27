@@ -15,9 +15,7 @@ from src.security_symbol import SecuritySedol
 
 class RiskBreakdownToFactor:
     def __init__(self, portforlio, benchmark, end_date) -> None:
-        self.holding_snapshot = portforlio.holding_snapshots[
-            datetime.date(portforlio.end_date.year, portforlio.end_date.month, 1)
-        ]
+        self.holding_snapshot = portforlio.holding_snapshots[end_date]
         self.month_range = 60
         # 60 months before end_date
         if end_date.month == 2 and end_date.day == 29:
@@ -97,6 +95,7 @@ class RiskBreakdownToFactor:
             .drop("date", axis=1)
             .set_index("security")
         )
+        self.security_weight = security_weight
         self.benchmark_weight = security_weight["benchmark_weight"]
         # TODO: why nan
         beta = beta.fillna(0)

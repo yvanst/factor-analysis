@@ -22,3 +22,15 @@ class RoeFactor(BaseFactor):
         security_list = list(RoeImpl(sedol_list).get_security_list(date))
         security_list = [SecuritySedol(id) for id in security_list]
         return security_list
+
+    def get_security_score(self, date):
+        sedol_list = (
+            pl.read_parquet("parquet/base/us_sector_weight.parquet")
+            .filter(pl.col("date").dt.year() == date.year)
+            .filter(pl.col("date").dt.month() == date.month)
+            .filter(pl.col("weight") > 0)
+            .select(pl.col("sedol7").unique())
+            .get_column("sedol7")
+            .to_list()
+        )
+        return RoeImpl(sedol_list).impl_security_z_score(date)
