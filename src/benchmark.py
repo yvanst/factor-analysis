@@ -24,25 +24,22 @@ class Benchmark:
         )
         return df
 
-    def get_performance_return_from_month_start(self):
-        self.market = Market(
-            [self.benchmark],
-            datetime.date(self.start_date.year, self.start_date.month, 1),
-            self.end_date,
+    def get_performance_return_monthly(self):
+        first_month = (
+            datetime.date(self.start_date.year, self.start_date.month + 1, 1)
+            if self.start_date.month != 12
+            else datetime.date(self.start_date.year + 1, 1, 1)
         )
         df: pl.DataFrame = self.market.data[self.benchmark]
         df = (
-            df.filter(pl.col("date") >= self.start_date - pl.duration(days=10))
+            # skip the month start_date in
+            df.filter(pl.col("date") >= first_month)
             .filter(pl.col("date") <= self.end_date)
             .rename({"adj close": "value"})
         )
-        df = (
-            df.with_columns(
-                (pl.col("value") / pl.col("value").shift(1) - 1).alias("return")
-            )
-            .filter(pl.col("date") >= self.start_date)
-            .select("date", "return")
-        )
+        df = df.with_columns(
+            (pl.col("value") / pl.col("value").shift(1) - 1).alias("return")
+        ).select("date", "return")
         return df
 
     def query_range_return(self, start_date, end_date):

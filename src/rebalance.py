@@ -122,7 +122,6 @@ class Rebalance:
 
     def minimum_tracking_error_portfolio_weight(self, cur_date):
         rb = RiskBreakdownToFactor(self.portfolio, self.benchmark, cur_date)
-        rb.calculate_stock_beta_against_factors()
 
         benchmark_weight = np.asarray(rb.benchmark_weight)
         portfolio_weight = np.asarray(rb.portfolio_weight)
@@ -143,7 +142,7 @@ class Rebalance:
                 w <= [1 if i > 0 else 0 for i in portfolio_weight],
             ],
         )
-        tracking_error = (problem.solve() * 12) ** 0.5
+        tracking_error = (problem.solve(solver=cp.ECOS) * 12) ** 0.5
 
         active_risk_i = []
         for i in range(rb.F.shape[1]):
@@ -168,7 +167,6 @@ class Rebalance:
 
     def mvo_portfolio_weight(self, cur_date):
         rb = RiskBreakdownToFactor(self.portfolio, self.benchmark, cur_date)
-        rb.calculate_stock_beta_against_factors()
 
         alpha: pd.DataFrame = (
             self.factor.get_security_score(cur_date)

@@ -109,8 +109,12 @@ class SecurityWeightUtil:
         # security weight: stock weight in end_date
         security_df = (
             pl.scan_parquet("parquet/base/us_sector_weight.parquet")
-            .filter(pl.col("date") >= self.start_date)
-            .filter(pl.col("date") <= self.end_date)
+            .filter(
+                pl.col("date").dt.month_end() > pl.lit(self.start_date).dt.month_end()
+            )
+            .filter(
+                pl.col("date").dt.month_start() <= pl.lit(self.end_date).dt.month_end()
+            )
             .select(["sedol7", "date", "weight"])
             .collect()
             .rename({"sedol7": "security"})

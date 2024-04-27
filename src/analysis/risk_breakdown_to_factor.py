@@ -25,19 +25,43 @@ class RiskBreakdownToFactor:
         self.benchmark = Benchmark(benchmark.benchmark, self.start_date, self.end_date)
         self.month_df = (
             pl.scan_parquet("parquet/base/us_sector_weight.parquet")
-            .filter(pl.col("date") >= self.start_date)
-            .filter(pl.col("date") <= self.end_date)
+            .filter(
+                pl.col("date").dt.month_end() > pl.lit(self.start_date).dt.month_end()
+            )
+            .filter(
+                pl.col("date").dt.month_start() <= pl.lit(self.end_date).dt.month_end()
+            )
             .select("date")
             .unique()
             .collect()
             .sort(pl.col("date"))
         )
+        self.index = [
+            "benchmark_return",
+            "Consumer Discretionary",
+            "Energy",
+            "Real Estate",
+            "Materials",
+            "Utilities",
+            "Information Technology",
+            "Communication Services",
+            "Health Care",
+            "Industrials",
+            "Consumer Staples",
+            "Financials",
+        ]
+        self.sector_list = self.index[1:].copy()
+        self.calculate_common_variables()
 
-    def calculate_stock_beta_against_factors(self):
+    def calculate_common_variables(self):
         security_df = (
             pl.scan_parquet("parquet/base/us_sector_weight.parquet")
-            .filter(pl.col("date") >= self.start_date)
-            .filter(pl.col("date") <= self.end_date)
+            .filter(
+                pl.col("date").dt.month_end() > pl.lit(self.start_date).dt.month_end()
+            )
+            .filter(
+                pl.col("date").dt.month_start() <= pl.lit(self.end_date).dt.month_end()
+            )
             .select(["sedol7", "date", "weight"])
             .collect()
             .rename({"sedol7": "security"})
@@ -55,24 +79,10 @@ class RiskBreakdownToFactor:
         residual, beta = self.regress(
             factor_orth, ticker_return_df.select(ticker_cols).to_pandas()
         )
-        index = [
-            "benchmark_return",
-            "Consumer Discretionary",
-            "Energy",
-            "Real Estate",
-            "Materials",
-            "Utilities",
-            "Information Technology",
-            "Communication Services",
-            "Health Care",
-            "Industrials",
-            "Consumer Staples",
-            "Financials",
-        ]
-        sector_list = index[1:]
-        K = len(index)
 
-        idiosyncratic_variance = residual.drop(index, axis=1).apply(
+        K = len(self.index)
+
+        idiosyncratic_variance = residual.drop(self.index, axis=1).apply(
             lambda x: sum(x**2) / (self.month_range - K), axis=0
         )
         idiosyncratic_variance = pd.DataFrame(
@@ -97,6 +107,7 @@ class RiskBreakdownToFactor:
         )
         self.security_weight = security_weight
         self.benchmark_weight = security_weight["benchmark_weight"]
+        self.portfolio_weight = security_weight["portfolio_weight"]
         # TODO: why nan
         beta = beta.fillna(0)
         self.beta = beta
@@ -105,8 +116,13 @@ class RiskBreakdownToFactor:
         #### total risk attribution 1
         F = factor_orth.cov()
         self.F = F
-        portfolio_weight = security_weight["portfolio_weight"]
-        self.portfolio_weight = portfolio_weight
+
+    def calculate_stock_beta_against_factors(self):
+        security_weight = self.security_weight
+        portfolio_weight = self.portfolio_weight
+        beta = self.beta
+        F = self.F
+        idiosyncratic_variance = self.idiosyncratic_variance
         systematic_risk = (
             portfolio_weight.dot(beta.T).dot(F).dot(beta).dot(portfolio_weight) * 12
         )
@@ -135,8 +151,8 @@ class RiskBreakdownToFactor:
             * 12
         )
 
-        F_sector = F.loc[np.isin(F.index.values, sector_list), sector_list]
-        beta_sector = beta.loc[np.isin(beta.index.values, sector_list), :]
+        F_sector = F.loc[np.isin(F.index.values, self.sector_list), self.sector_list]
+        beta_sector = beta.loc[np.isin(beta.index.values, self.sector_list), :]
         total_risk_sector = (
             portfolio_weight.dot(beta_sector.T)
             .dot(F_sector)
@@ -223,7 +239,7 @@ class RiskBreakdownToFactor:
 
     def get_orthogonalized_factor(self, use_intercept=True):
         benchmark_return_df: pl.DataFrame = (
-            self.benchmark.get_performance_return_from_month_start()
+            self.benchmark.get_performance_return_monthly()
         )
         benchmark_return_df = (
             benchmark_return_df.group_by(pl.col("date").dt.month_start())
