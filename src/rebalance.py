@@ -36,6 +36,10 @@ class Rebalance:
             return False
         if iter_index + 1 >= len(self.portfolio.date_df):
             return False
+        if iter_index == 1 and self.weight_strategy != "EQUAL":
+            self.run(iter_index)
+            # do not refresh last rebalance index
+            return False
 
         if self.interval == "1d":
             if iter_index % self.period == 0:
@@ -201,7 +205,7 @@ class Rebalance:
                 risk <= 0.01 / 12,
             ],
         )
-        problem.sovle()
+        problem.solve(solver=cp.ECOS)
         series = pd.Series(w.value, index=rb.benchmark_weight.index)
         series = series[series > 1e-4]
         position = list(series.to_dict().items())

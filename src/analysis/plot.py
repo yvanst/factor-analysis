@@ -2,23 +2,37 @@ import matplotlib.pyplot as plt
 
 
 class Plot:
-    def __init__(self, long_portfolio, short_portfolio, benchmark, benchmark_label):
-        self.long_portfolio = long_portfolio
-        self.short_portfolio = short_portfolio
-        self.long_portfolio_value = long_portfolio.value_book.get_column("value")
-        self.short_portfolio_value = short_portfolio.value_book.get_column("value")
-        self.dates = long_portfolio.date_df.get_column("date")
+    def __init__(
+        self,
+        equal_portfolio,
+        min_te_portfolio,
+        mvo_portfolio,
+        benchmark,
+        benchmark_label,
+    ):
+        self.equal_portfolio = equal_portfolio
+        self.min_te_portfolio = min_te_portfolio
+        self.mvo_portfolio = mvo_portfolio
+        self.equal_portfolio_value = equal_portfolio.value_book.get_column("value")
+        self.min_te_portfolio_value = min_te_portfolio.value_book.get_column("value")
+        self.mvo_portfolio_value = mvo_portfolio.value_book.get_column("value")
+        self.dates = equal_portfolio.date_df.get_column("date")
         self.benchmark_value = benchmark.get_column("value")
         self.benchmark_label = benchmark_label
         _, self.ax = plt.subplots(1, 1, figsize=(10, 5))
 
     def draw(self):
-        portfolios = [self.long_portfolio_value, self.short_portfolio_value]
-        portfolio_labels = [
-            f"LONG - {self.benchmark_label}",
-            f"SHORT - {self.benchmark_label}",
+        portfolios = [
+            self.equal_portfolio_value,
+            self.min_te_portfolio_value,
+            self.mvo_portfolio_value,
         ]
-        colors = ["tab:green", "tab:red"]
+        portfolio_labels = [
+            f"EQUAL - {self.benchmark_label}",
+            f"MIN_TE - {self.benchmark_label}",
+            f"MVO - {self.benchmark_label}",
+        ]
+        colors = ["tab:red", "tab:green", "tab:pink"]
         for p, l, c in zip(portfolios, portfolio_labels, colors):
             relative_value = p - self.benchmark_value
             self.ax.plot(self.dates, relative_value, label=l, color=c)
@@ -30,12 +44,6 @@ class Plot:
             color="tab:blue",
         )
 
-        self.ax.plot(
-            self.dates,
-            self.long_portfolio_value - self.short_portfolio_value,
-            label="LONG - SHORT",
-            color="tab:pink",
-        )
         step = self.dates.shape[0] // 30
         self.ax.set_xticks(
             ticks=self.dates[::step],

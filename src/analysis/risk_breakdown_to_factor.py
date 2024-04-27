@@ -16,11 +16,15 @@ from src.security_symbol import SecuritySedol, SecurityTicker
 class RiskBreakdownToFactor:
     def __init__(self, portforlio, benchmark, end_date) -> None:
         self.holding_snapshot = portforlio.holding_snapshots[end_date]
-        self.month_range = 60
         # 60 months before end_date
+        self.month_range = 60
+        assert self.month_range % 12 == 0
+
         if end_date.month == 2 and end_date.day == 29:
             end_date = datetime.date(end_date.year, 2, 28)
-        self.start_date = datetime.date(end_date.year - 5, end_date.month, end_date.day)
+        self.start_date = datetime.date(
+            end_date.year - (self.month_range // 12), end_date.month, end_date.day
+        )
         self.end_date = end_date
         self.benchmark = Benchmark(benchmark.benchmark, self.start_date, self.end_date)
         self.month_df = (
@@ -255,6 +259,9 @@ class RiskBreakdownToFactor:
             benchmark_select = ["intercept", "benchmark_return"]
 
         sector_return_df = self.get_sector_monthly_return_df().sort(pl.col("date"))
+
+        assert sector_return_df.shape[0] == self.month_range
+
         self.benchmark_return_df = benchmark_return_df
         self.sector_return_df = sector_return_df
         factor_orth, beta = self.regress(

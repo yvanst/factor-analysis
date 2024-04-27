@@ -1,12 +1,8 @@
 import datetime
 
-from src.analysis.hit_rate import HitRate
-from src.analysis.information_coefficient import InformationCoefficient
-from src.analysis.metric import Metric
 from src.analysis.plot import Plot
 from src.backtest import BackTest
 from src.benchmark import Benchmark
-from src.factor.cape import CapeFactor
 from src.factor.roe import RoeFactor
 from src.fund_universe import SECURITY_SEDOL
 from src.market import Market
@@ -14,67 +10,77 @@ from src.portfolio import Portfolio
 from src.rebalance import Rebalance
 from src.security_symbol import SecurityTicker
 
-start_date = datetime.date(2012, 12, 31)
-end_date = datetime.date(2023, 10, 31)
+start_date = datetime.date(2015, 8, 30)
+end_date = datetime.date(2015, 10, 31)
 security_universe = SECURITY_SEDOL
 rebalance_period = 1
 rebalance_interval = "1mo"
-weight_strategy = "MIN_TE"
+# could be EQUAL|MIN_TE|MVO
+weight_strategy = "MVO"
 Factor = RoeFactor
 market = Market(security_universe, start_date, end_date)
 benchmark = Benchmark(SecurityTicker("^SPX", "index"), start_date, end_date)
 benchmark_performance = benchmark.get_performance()
 
-### Long factor
-long_factor = Factor(security_universe, "long")
-long_portfolio = Portfolio(100.0, start_date, end_date)
-long_factor.set_portfolio_at_start(long_portfolio)
+### equal weight factor
+equal_factor = Factor(security_universe, "long")
+equal_portfolio = Portfolio(100.0, start_date, end_date)
+equal_factor.set_portfolio_at_start(equal_portfolio)
 
 rebalance = Rebalance(
     rebalance_period,
-    long_portfolio,
-    long_factor,
+    equal_portfolio,
+    equal_factor,
     benchmark,
     rebalance_interval,
-    weight_strategy,
+    "EQUAL",
 )
 
-backtest = BackTest(long_portfolio, market, rebalance)
+backtest = BackTest(equal_portfolio, market, rebalance)
 backtest.run()
 
-### Short factor
-short_factor = Factor(security_universe, "short")
-short_portfolio = Portfolio(100.0, start_date, end_date)
-short_factor.set_portfolio_at_start(short_portfolio)
+
+### minimum tracking error factor
+min_te_factor = Factor(security_universe, "long")
+min_te_portfolio = Portfolio(100.0, start_date, end_date)
+min_te_factor.set_portfolio_at_start(min_te_portfolio)
 
 rebalance = Rebalance(
     rebalance_period,
-    short_portfolio,
-    short_factor,
+    min_te_portfolio,
+    min_te_factor,
     benchmark,
     rebalance_interval,
-    weight_strategy,
+    "MIN_TE",
 )
 
-backtest = BackTest(short_portfolio, market, rebalance)
+backtest = BackTest(min_te_portfolio, market, rebalance)
 backtest.run()
+
+
+### MVO factor
+mvo_factor = Factor(security_universe, "long")
+mvo_portfolio = Portfolio(100.0, start_date, end_date)
+mvo_factor.set_portfolio_at_start(mvo_portfolio)
+
+rebalance = Rebalance(
+    rebalance_period,
+    mvo_portfolio,
+    mvo_factor,
+    benchmark,
+    rebalance_interval,
+    "MVO",
+)
+
+backtest = BackTest(mvo_portfolio, market, rebalance)
+backtest.run()
+
 
 ### plot
-
-
-# metric = Metric(long_portfolio, benchmark_performance)
-# print(f"portfolio annulized return: {metric.portfolio_annualized_return()}")
-# print(
-#     f"portfolio annulized return relative to benchmark: {metric.annualized_return_relative_to_benchmark()}"
-# )
-# print(f"information ratio: {metric.information_ratio()}")
-# print(f"average monthly turnover: {metric.avg_monthly_turnover()}")
-# print(f"sharpe ratio(with risk-free rate 0.04): {metric.sharpe_ratio()}")
-
-
 plot = Plot(
-    long_portfolio,
-    short_portfolio,
+    equal_portfolio,
+    min_te_portfolio,
+    mvo_portfolio,
     benchmark_performance,
     "SPX",
 )
